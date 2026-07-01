@@ -77,11 +77,13 @@ const DOM = {
   btnNextStudent: document.getElementById('btn-next-student'),
   editorSubjectSelect: document.getElementById('editor-subject-select'),
   editorSubjectDirectInput: document.getElementById('editor-subject-direct-input'),
+  editorTeacherInput: document.getElementById('editor-teacher-input'),
   editableContent: document.getElementById('editable-content'),
   charCount: document.getElementById('char-count'),
   byteCount: document.getElementById('byte-count'),
   errorsCountBadge: document.getElementById('errors-count-badge'),
   btnApplyAllFixes: document.getElementById('btn-apply-all-fixes'),
+  btnCopyRequestMessage: document.getElementById('btn-copy-request-message'),
   inspectionResultsList: document.getElementById('inspection-results-list'),
   
   // Tab 3: 설정
@@ -320,11 +322,22 @@ function initEventListeners() {
         DOM.editorSubjectDirectInput.value = stud.subject || '';
         DOM.editorSubjectDirectInput.focus();
       } else {
-        stud.subject = val;
-        saveStudentsToStorage();
-        renderStudentTable();
-        updateFilterDropdowns();
-        renderEditorStudentList();
+        // 동일 이름의 다른 과목 레코드가 있는지 우선 매핑 검사
+        const targetIndex = state.students.findIndex(s => s.name === stud.name && s.subject === val);
+        if (targetIndex !== -1) {
+          // 이미 존재하면 해당 과목의 점검 화면으로 즉시 스위칭 이동
+          loadStudentIntoEditor(targetIndex);
+          showToast(`'${stud.name}' 학생의 '${val}' 점검 화면으로 이동했습니다.`);
+        } else {
+          // 존재하지 않으면 현재 레코드의 과목명 자체를 새로 변경
+          stud.subject = val;
+          saveStudentsToStorage();
+          renderStudentTable();
+          updateFilterDropdowns();
+          renderEditorStudentList();
+          // 변경 완료 후 재빌드
+          loadStudentIntoEditor(state.currentStudentIndex);
+        }
       }
     });
   }
@@ -376,6 +389,97 @@ function initEventListeners() {
     DOM.editorStudentFilterClass.addEventListener('change', (e) => {
       state.editorFilters.class = e.target.value;
       renderEditorStudentList();
+    });
+  }
+
+  // 담당 교사명 변경 감지 및 로컬스토리지 저장
+  if (DOM.editorTeacherInput) {
+    DOM.editorTeacherInput.addEventListener('input', (e) => {
+      if (state.currentStudentIndex !== -1) {
+        state.students[state.currentStudentIndex].teacher = e.target.value;
+        saveStudentsToStorage();
+      }
+    });
+  }
+
+  // 담당 선생님 전송용 수정 요청 사항 클립보드 복사 리스너
+  if (DOM.btnCopyRequestMessage) {
+    DOM.btnCopyRequestMessage.addEventListener('click', () => {
+      if (state.currentStudentIndex === -1) {
+        showToast('학생을 먼저 선택해 주세요.');
+        return;
+      }
+      const stud = state.students[state.currentStudentIndex];
+      const teacherName = stud.teacher || '과목 담당';
+      const subjectName = stud.subject || '해당 과목';
+      const studentName = stud.name || '학생';
+      const studentMeta = `${stud.year}학년도 ${stud.term} - ${stud.sNum || '학번 없음'}`;
+      const contentText = stud.content || '';
+      
+      // 에러 목록 빌드
+      let errorLines = '';
+      if (stud.errors && stud.errors.length > 0) {
+        stud.errors.forEach((err, index) => {
+          const errorLabel = err.ruleName || err.type || '점검 항목';
+          const matchedVal = contentText.substring(err.start, err.end);
+          const replaceVal = err.replace || '(대체어 없음)';
+          const errorReason = err.reason ? ` (${err.reason})` : '';
+          errorLines += `${index + 1}. [${errorLabel}] '${matchedVal}' ➔ '${replaceVal}'로 수정 제안${errorReason}\n`;
+        });
+      } else {
+        errorLines = '검출된 수정 제안 사항이 없습니다. (양호)\n';
+      }
+      
+      // 템플릿 조립
+      const message = `📢 [생기부 세특 수정 요청 사항 안내]
+
+안녕하세요, 선생님. 생기부 점검기 검출 결과에 따른 교정 요청 사항을 보내드립니다.
+
+👤 대상 학생: ${studentName} (${studentMeta})
+📚 해당 과목: ${subjectName} (담당: ${teacherName} 선생님)
+--------------------------------------------------
+📝 수정 대상 원문:
+"${contentText}"
+
+⚠️ 점검 검출 사항 (총 ${stud.errors ? stud.errors.length : 0}건):
+${errorLines}--------------------------------------------------
+점검 시스템 제안에 따라 확인 및 반영을 부탁드립니다. 감사합니다.`;
+      
+      // 클립보드 복사 수행
+      navigator.clipboard.writeText(message).then(() => {
+        showToast('✉️ 선생님 전송용 수정 요청 사항이 클립보드에 복사되었습니다! 메신저 등에 붙여넣어 전송하세요.');
+      }).catch(err => {
+        console.error('클립보드 복사 실패:', err);
+        showToast('클립보드 복사에 실패했습니다. 수동으로 복사해 주세요.');
+      });
+    });
+  }
+
+  // 에디터 좌측 학생 명부 접기/펼치기 토글 리스너
+  const sidebar = document.querySelector('.sidebar-student-list');
+  const btnCollapse = document.getElementById('btn-collapse-student-list');
+  const btnExpand = document.getElementById('btn-expand-student-list');
+  
+  if (btnCollapse && sidebar) {
+    btnCollapse.addEventListener('click', () => {
+      sidebar.classList.add('collapsed');
+      if (btnExpand) btnExpand.style.display = 'inline-flex';
+    });
+  }
+  
+  if (btnExpand && sidebar) {
+    btnExpand.addEventListener('click', () => {
+      sidebar.classList.remove('collapsed');
+      btnExpand.style.display = 'none';
+    });
+  }
+
+  // 메인 최좌측 사이드바 접기/펼치기 토글 리스너
+  const mainSidebar = document.querySelector('aside.sidebar');
+  const btnToggleMain = document.getElementById('btn-toggle-main-sidebar');
+  if (btnToggleMain && mainSidebar) {
+    btnToggleMain.addEventListener('click', () => {
+      mainSidebar.classList.toggle('collapsed');
     });
   }
 
@@ -582,10 +686,11 @@ function handleExcelUpload(e) {
         sNum: headers.findIndex(h => h.includes('학번') || h.includes('번호')),
         name: headers.findIndex(h => h.includes('이름') || h.includes('성명')),
         subject: headers.findIndex(h => h.includes('과목') || h.includes('주제') || h.includes('활동')),
-        content: headers.findIndex(h => h.includes('내용') || h.includes('특기사항') || h.includes('세부특기'))
+        content: headers.findIndex(h => h.includes('내용') || h.includes('특기사항') || h.includes('세부특기')),
+        teacher: headers.findIndex(h => h.includes('교사') || h.includes('선생님') || h.includes('담당'))
       };
 
-      // 만약 헤더 매칭이 실패했다면 컬럼 순서 기반 Fallback (0:구분, 1:학년도, 2:학기, 3:학번, 4:이름, 5:과목명, 6:내용)
+      // 만약 헤더 매칭이 실패했다면 컬럼 순서 기반 Fallback
       if (colMap.name === -1 && colMap.content === -1) {
         colMap.type = 0;
         colMap.year = 1;
@@ -594,6 +699,7 @@ function handleExcelUpload(e) {
         colMap.name = 4;
         colMap.subject = 5;
         colMap.content = 6;
+        colMap.teacher = 7;
       }
 
       const newStudents = [];
@@ -624,6 +730,7 @@ function handleExcelUpload(e) {
           name: nameVal,
           subject: colMap.subject !== -1 ? getRowVal(colMap.subject) : '',
           content: contentVal,
+          teacher: colMap.teacher !== -1 ? getRowVal(colMap.teacher) : '',
           errors: [],
           checked: false
         });
@@ -676,14 +783,18 @@ function runAnalysisOnStudent(index) {
   stud.errors = window.inspectStudentRecord(stud.content, stud.name, customConfig);
   stud.checked = true;
 
-  // 좌측 학생 명부 중 해당 행의 완료/경고 배지만 부분 업데이트하여 성능 저하 및 포커스 튐 차단
+  // 좌측 학생 명부 중 해당 학생의 완료/경고 배지만 부분 업데이트하여 성능 저하 및 포커스 튐 차단
   if (DOM.editorStudentListContainer) {
-    const item = DOM.editorStudentListContainer.querySelector(`.editor-student-item[data-index="${index}"]`);
+    const studKey = `${stud.sNum || '학번없음'}_${stud.name}`;
+    const item = DOM.editorStudentListContainer.querySelector(`.editor-student-item[data-student-key="${studKey}"]`);
     if (item) {
       const statusDiv = item.querySelector('.editor-student-item-status');
       if (statusDiv) {
-        const errCount = stud.errors ? stud.errors.length : 0;
-        statusDiv.innerHTML = errCount > 0 
+        // 이 학생의 모든 수강 과목 레코드를 다 모아 통합 에러 연산 수행
+        const studentAllRecords = state.students.filter(s => s.name === stud.name && s.sNum === stud.sNum);
+        const totalErrCount = studentAllRecords.reduce((sum, r) => sum + (r.errors ? r.errors.length : 0), 0);
+        
+        statusDiv.innerHTML = totalErrCount > 0 
           ? '<i data-lucide="alert-circle" class="status-icon-warn" style="width:16px; height:16px;"></i>'
           : '<i data-lucide="check-circle" class="status-icon-ok" style="width:16px; height:16px;"></i>';
         lucide.createIcons();
@@ -975,6 +1086,7 @@ function addNewStudentRow() {
     name: '새 학생',
     subject: '',
     content: '내용을 입력해 주세요.',
+    teacher: '',
     errors: [],
     checked: false
   };
@@ -1014,10 +1126,11 @@ function loadStudentIntoEditor(index) {
   DOM.currentStudentName.textContent = stud.name || '이름 없음';
   DOM.currentStudentMeta.textContent = `[${stud.type}] ${stud.year}학년도 ${stud.term} - ${stud.sNum || '학번 없음'}`;
   
-  // 과목 선택 드롭다운 옵션 동적 빌드 (전체 학생 과목 기반)
+  // 과목 선택 드롭다운 옵션 동적 빌드 (현재 고유 학생이 소유한 과목 기반)
   if (DOM.editorSubjectSelect) {
+    const studentCourses = state.students.filter(s => s.name === stud.name && s.sNum === stud.sNum);
     const subjects = new Set();
-    state.students.forEach(s => {
+    studentCourses.forEach(s => {
       if (s.subject) subjects.add(s.subject);
     });
     
@@ -1051,6 +1164,11 @@ function loadStudentIntoEditor(index) {
     }
   }
   
+  // 담당 교사 입력값 주입
+  if (DOM.editorTeacherInput) {
+    DOM.editorTeacherInput.value = stud.teacher || '';
+  }
+  
   // 에디터 내용 주입 (포커스 아닐 때만 전체 주입)
   DOM.editableContent.innerText = stud.content || '';
   
@@ -1063,12 +1181,13 @@ function loadStudentIntoEditor(index) {
   renderInspectionResults();
   updateDashboardStats();
   
-  // 좌측 명부 스크롤 리스트 활성화 처리 동기화
+  // 좌측 명부 스크롤 리스트 활성화 처리 동기화 (고유 학번_이름 키 기준)
   if (DOM.editorStudentListContainer) {
     const items = DOM.editorStudentListContainer.querySelectorAll('.editor-student-item');
+    const activeKey = `${stud.sNum || '학번없음'}_${stud.name}`;
     items.forEach(item => {
-      const idx = parseInt(item.getAttribute('data-index'));
-      if (idx === index) {
+      const key = item.getAttribute('data-student-key');
+      if (key === activeKey) {
         item.classList.add('active');
         item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
@@ -1193,33 +1312,22 @@ function renderInspectionResults() {
     const card = document.createElement('div');
     card.className = `error-card card-${err.type}`;
     card.setAttribute('data-start', err.start);
-    
-    // 아이콘 매핑
-    let icon = 'alert-triangle';
-    if (err.type === 'spelling') icon = 'spellcheck';
-    if (err.type === 'slang') icon = 'message-square-warning';
-    if (err.type === 'loanword') icon = 'globe';
-    if (err.type === 'forbidden') icon = 'slash';
-    if (err.type === 'spacing') icon = 'align-justify';
-    if (err.type === 'endingDot') icon = 'circle-dot';
-    if (err.type === 'nameCheck') icon = 'user-x';
 
     card.innerHTML = `
-      <div class="error-card-icon">
-        <i data-lucide="${icon}"></i>
-      </div>
       <div class="error-card-content">
-        <div class="error-card-label">${err.label}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span class="error-card-label">${err.label}</span>
+          <div class="error-card-actions">
+            <button class="btn-text btn-apply-fix" data-idx="${idx}">반영</button>
+            <button class="btn-text btn-ignore-fix" data-idx="${idx}">예외</button>
+          </div>
+        </div>
         <div class="error-card-match">
           <del>${escapeHTML(err.original)}</del> 
-          <i data-lucide="arrow-right" style="width:12px; height:12px; vertical-align:middle; display:inline-block; margin: 0 4px;"></i> 
-          <ins style="background-color: rgba(0,0,0,0.05); text-decoration:none;">${escapeHTML(err.replace)}</ins>
+          <span style="color: var(--text-light); margin: 0 4px; font-weight: 400;">➔</span> 
+          <ins>${escapeHTML(err.replace)}</ins>
         </div>
         <div class="error-card-desc">${escapeHTML(err.reason)}</div>
-        <div class="error-card-actions">
-          <button class="btn btn-secondary btn-apply-fix" style="padding: 2px 8px; font-size: 11px;" data-idx="${idx}">수정 적용</button>
-          <button class="btn btn-secondary btn-ignore-fix" style="padding: 2px 8px; font-size: 11px;" data-idx="${idx}">예외 추가</button>
-        </div>
       </div>
     `;
 
@@ -1445,7 +1553,7 @@ function exportCheckedDataToExcel() {
   }
 
   // 다운로드용 2차원 배열 데이터 구축
-  const headers = ['구분', '학년도', '학기', '학번', '이름', '과목명 / 주제명', '수정 완료 내용', '남은 오류 개수'];
+  const headers = ['구분', '학년도', '학기', '학번', '이름', '과목명 / 주제명', '담당 교사', '수정 완료 내용', '남은 오류 개수'];
   const rows = [headers];
 
   state.students.forEach(s => {
@@ -1456,6 +1564,7 @@ function exportCheckedDataToExcel() {
       s.sNum,
       s.name,
       s.subject,
+      s.teacher || '',
       s.content,
       s.errors ? s.errors.length : 0
     ]);
@@ -1472,12 +1581,12 @@ function exportCheckedDataToExcel() {
 
 // 15. 샘플 다운로드 기능 (Dummy Data)
 function downloadSampleExcel() {
-  const sampleHeaders = ['구분', '학년도', '학기', '학번', '이름', '과목명/주제명', '내용 (생활기록부 세부 특기사항)'];
+  const sampleHeaders = ['구분', '학년도', '학기', '학번', '이름', '과목명/주제명', '담당 교사', '내용 (생활기록부 세부 특기사항)'];
   const sampleRows = [
     sampleHeaders,
-    ['세특', '2026', '1학기', '30101', '김철수', '물리학I', '수업 시간에 집중력이 매우 뛰어나며 모둠 활동에서 중추적 역활을 성실히 수행함  특히 물리 실험 시물레이션 프로그램을 제작년보다 훨씬 정교하게 구현하여 동료들의 극찬을 받음'],
-    ['세특', '2026', '1학기', '30102', '이영희', '정보과학', '정보과학 교과의 알고리즘 설계 과정에서 개이득을 취하기 위해 꼼꼼이 준비함. 영희는 평소 영어 학습에도 흥미가 깊어 토익 시험을 꾸준히 준비함'],
-    ['주제선택', '2026', '1학기', '30103', '박민수', '창의융합과학', '다양한 융합 실험을 기획하고 이끄는 역량이 탁월함. 탐구 결과 보고서를 작성하는 과정에서 띄어쓰기와 맞춤법을 정확히 준수하며 가짐으로 성숙한 학술적 태도가 됬다']
+    ['세특', '2026', '1학기', '30101', '김철수', '물리학I', '김물리', '수업 시간에 집중력이 매우 뛰어나며 모둠 활동에서 중추적 역활을 성실히 수행함  특히 물리 실험 시물레이션 프로그램을 제작년보다 훨씬 정교하게 구현하여 동료들의 극찬을 받음'],
+    ['세특', '2026', '1학기', '30102', '이영희', '정보과학', '박정보', '정보과학 교과의 알고리즘 설계 과정에서 개이득을 취하기 위해 꼼꼼이 준비함. 영희는 평소 영어 학습에도 흥미가 깊어 토익 시험을 꾸준히 준비함'],
+    ['주제선택', '2026', '1학기', '30103', '박민수', '창의융합과학', '최융합', '다양한 융합 실험을 기획하고 이끄는 역량이 탁월함. 탐구 결과 보고서를 작성하는 과정에서 띄어쓰기와 맞춤법을 정확히 준수하며 가짐으로 성숙한 학술적 태도가 됬다']
   ];
 
   const worksheet = XLSX.utils.aoa_to_sheet(sampleRows);
@@ -1912,7 +2021,7 @@ function renderSubjectGroupView() {
   rebuildSelect(DOM.filterSubject, subjects, '과목');
 }
 
-// 에디터 좌측 학생 명부 렌더링 함수
+// 에디터 좌측 학생 명부 렌더링 함수 (고유 학생 단위 중복 제거 개편)
 function renderEditorStudentList() {
   const container = DOM.editorStudentListContainer;
   if (!container) return;
@@ -1941,15 +2050,25 @@ function renderEditorStudentList() {
     return true;
   });
 
+  // 고유 학생(학번 + 이름) 기준으로 중복 제거 그룹화
+  const uniqueStudentsMap = new Map();
+  filtered.forEach(s => {
+    const key = `${s.sNum || '학번없음'}_${s.name}`;
+    if (!uniqueStudentsMap.has(key)) {
+      uniqueStudentsMap.set(key, s);
+    }
+  });
+  const uniqueStudents = Array.from(uniqueStudentsMap.values());
+
   // 학번순(오름차순) 정렬
-  filtered.sort((a, b) => String(a.sNum).localeCompare(String(b.sNum)));
+  uniqueStudents.sort((a, b) => String(a.sNum).localeCompare(String(b.sNum)));
 
   // 명부 개수 표시
   if (DOM.editorStudentCount) {
-    DOM.editorStudentCount.textContent = filtered.length;
+    DOM.editorStudentCount.textContent = uniqueStudents.length;
   }
 
-  if (filtered.length === 0) {
+  if (uniqueStudents.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; color: var(--text-secondary); padding: 24px 8px; font-size: 12px;">
         조건에 맞는 학생이 없습니다.
@@ -1958,20 +2077,31 @@ function renderEditorStudentList() {
     return;
   }
 
-  filtered.forEach((stud, idx) => {
-    // 실제 state.students 내의 전체 인덱스 탐색
+  uniqueStudents.forEach((stud, idx) => {
+    // 실제 state.students 내의 전체 인덱스 탐색 (해당 학생의 첫 과목 레코드 인덱스)
     const actualIndex = state.students.findIndex(s => s.id === stud.id);
+    const studKey = `${stud.sNum || '학번없음'}_${stud.name}`;
     
     const item = document.createElement('div');
-    const isActive = (state.currentStudentIndex === actualIndex);
+    // active 여부는 고유 학번_이름 키 기준으로 동기화
+    let isActive = false;
+    if (state.currentStudentIndex !== -1) {
+      const currStud = state.students[state.currentStudentIndex];
+      isActive = (`${currStud.sNum || '학번없음'}_${currStud.name}` === studKey);
+    }
+    
     item.className = `editor-student-item ${isActive ? 'active' : ''}`;
+    item.setAttribute('data-student-key', studKey);
     item.setAttribute('data-index', actualIndex);
     
     const { grade, classVal } = parseGradeAndClass(stud.sNum);
-    const errCount = stud.errors ? stud.errors.length : 0;
+    
+    // 이 학생이 수강 중인 모든 과목 레코드를 모아 통합 에러 연산
+    const studentAllRecords = state.students.filter(s => s.name === stud.name && s.sNum === stud.sNum);
+    const totalErrCount = studentAllRecords.reduce((sum, r) => sum + (r.errors ? r.errors.length : 0), 0);
     
     // 에러 상태에 따른 아이콘 및 클래스
-    const statusIcon = errCount > 0 
+    const statusIcon = totalErrCount > 0 
       ? '<i data-lucide="alert-circle" class="status-icon-warn" style="width:16px; height:16px;"></i>'
       : '<i data-lucide="check-circle" class="status-icon-ok" style="width:16px; height:16px;"></i>';
 

@@ -68,6 +68,7 @@ body {
 }
 
 /* Sidebar Layout */
+/* Sidebar Layout */
 aside.sidebar {
   width: 240px;
   background-color: var(--bg-secondary);
@@ -75,6 +76,12 @@ aside.sidebar {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+aside.sidebar.collapsed {
+  width: 64px;
 }
 
 .sidebar-header {
@@ -82,16 +89,28 @@ aside.sidebar {
   display: flex;
   align-items: center;
   gap: 8px;
+  transition: padding 0.25s ease;
+}
+
+aside.sidebar.collapsed .sidebar-header {
+  padding: 16px 0;
+  justify-content: center !important;
+}
+
+aside.sidebar.collapsed .sidebar-brand-wrapper {
+  display: none !important;
 }
 
 .sidebar-title {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .sidebar-logo {
   font-size: 20px;
+  flex-shrink: 0;
 }
 
 .sidebar-menu {
@@ -100,6 +119,11 @@ aside.sidebar {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  transition: padding 0.25s ease;
+}
+
+aside.sidebar.collapsed .sidebar-menu {
+  padding: 0 4px;
 }
 
 .menu-item {
@@ -113,7 +137,17 @@ aside.sidebar {
   border-radius: 4px;
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, padding 0.25s ease, gap 0.25s ease, justify-content 0.25s ease;
+}
+
+aside.sidebar.collapsed .menu-item {
+  justify-content: center;
+  padding: 10px 0;
+  gap: 0;
+}
+
+aside.sidebar.collapsed .menu-item span {
+  display: none;
 }
 
 .menu-item:hover {
@@ -137,6 +171,17 @@ aside.sidebar {
   font-size: 12px;
   color: var(--text-light);
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: padding 0.25s ease;
+}
+
+aside.sidebar.collapsed .sidebar-footer {
+  padding: 16px 0;
+}
+
+aside.sidebar.collapsed .sidebar-footer p {
+  display: none;
 }
 
 /* Main Content Area */
@@ -232,10 +277,10 @@ main.content-area {
 
 /* Tab 1: Data Management Grid */
 .data-tab-wrapper {
-  padding: 24px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   height: 100%;
   overflow-y: auto;
 }
@@ -404,7 +449,7 @@ main.content-area {
 
 /* Student selection box */
 .student-selector-bar {
-  padding: 12px 24px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -437,15 +482,15 @@ main.content-area {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 12px;
   overflow: hidden;
 }
 
 .editor-field-group {
   display: grid;
   grid-template-columns: 100px 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 8px;
   flex-shrink: 0;
 }
 
@@ -596,7 +641,7 @@ main.content-area {
 }
 
 .results-header {
-  padding: 16px 20px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -624,11 +669,11 @@ main.content-area {
 
 .results-list {
   flex-grow: 1;
-  padding: 16px;
+  padding: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
 
 /* Empty State */
@@ -638,52 +683,41 @@ main.content-area {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 40px 20px;
+  padding: 24px 16px;
   color: var(--text-secondary);
   height: 100%;
 }
 
 .empty-state i {
-  font-size: 40px;
-  margin-bottom: 12px;
+  font-size: 32px;
+  margin-bottom: 8px;
   color: var(--text-light);
 }
 
 .empty-state h4 {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   margin-bottom: 4px;
   color: var(--text-primary);
 }
 
 .empty-state p {
-  font-size: 12px;
+  font-size: 11px;
 }
 
-/* Notion Callout Box as Error Card (개편된 세련된 화이트 룩) */
+/* Notion-like Flat Review List Item (개편된 심플 룩) */
 .error-card {
   display: flex;
-  gap: 12px;
-  padding: 14px 18px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.015);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: transparent;
   font-size: 13px;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease;
   cursor: pointer;
 }
 
 .error-card:hover {
-  border-color: rgba(0, 0, 0, 0.15);
-  box-shadow: 0 3px 10px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.03);
-  transform: translateY(-1px);
-}
-
-.error-card-icon {
-  font-size: 16px;
-  flex-shrink: 0;
-  margin-top: 2px;
+  background-color: var(--bg-hover);
 }
 
 .error-card-content {
@@ -691,15 +725,14 @@ main.content-area {
 }
 
 .error-card-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  margin-bottom: 3px;
-  color: var(--text-light);
+  color: var(--text-secondary);
 }
 
 .error-card-match {
-  margin-bottom: 6px;
+  margin: 4px 0;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -712,25 +745,43 @@ main.content-area {
 .error-card-match ins {
   text-decoration: none;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 1px 4px;
+  border-radius: 3px;
 }
 
 .error-card-desc {
   font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-bottom: 10px;
+  color: var(--text-light);
+  line-height: 1.4;
+  margin-top: 2px;
 }
 
 .error-card-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* Error card color mapping (좌측의 4px 칼라바로 노이즈 억제) */
+/* 텍스트형 링크 버튼 스타일 */
+.btn-text {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-text:hover {
+  background-color: var(--bg-selected);
+  color: var(--border-focus);
+}
+
+/* Error card color mapping (좌측의 2px 칼라바로 슬림화) */
 .error-card.card-spelling {
-  border-left: 4px solid var(--color-spelling-text);
+  border-left: 2px solid var(--color-spelling-text);
 }
 .error-card.card-spelling ins {
   background-color: var(--color-spelling-bg);
@@ -741,7 +792,7 @@ main.content-area {
 }
 
 .error-card.card-slang {
-  border-left: 4px solid var(--color-slang-text);
+  border-left: 2px solid var(--color-slang-text);
 }
 .error-card.card-slang ins {
   background-color: var(--color-slang-bg);
@@ -752,7 +803,7 @@ main.content-area {
 }
 
 .error-card.card-loanword {
-  border-left: 4px solid var(--color-loanword-text);
+  border-left: 2px solid var(--color-loanword-text);
 }
 .error-card.card-loanword ins {
   background-color: var(--color-loanword-bg);
@@ -763,7 +814,7 @@ main.content-area {
 }
 
 .error-card.card-forbidden {
-  border-left: 4px solid var(--color-forbidden-text);
+  border-left: 2px solid var(--color-forbidden-text);
 }
 .error-card.card-forbidden ins {
   background-color: var(--color-forbidden-bg);
@@ -775,7 +826,7 @@ main.content-area {
 
 .error-card.card-spacing,
 .error-card.card-endingDot {
-  border-left: 4px solid #6b7280;
+  border-left: 2px solid #6b7280;
 }
 .error-card.card-spacing ins,
 .error-card.card-endingDot ins {
@@ -784,7 +835,7 @@ main.content-area {
 }
 
 .error-card.card-nameCheck {
-  border-left: 4px solid #37352f;
+  border-left: 2px solid #37352f;
 }
 .error-card.card-nameCheck ins {
   background-color: var(--color-nameCheck-bg);
@@ -795,8 +846,9 @@ main.content-area {
 .split-container {
   display: flex;
   height: calc(100vh - 56px); /* 헤더바 감안 */
-  margin: -24px;
+  margin: 0;
   overflow: hidden;
+  width: 100%;
 }
 
 .sidebar-student-list {
@@ -806,6 +858,25 @@ main.content-area {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, border-color 0.25s ease;
+  opacity: 1;
+}
+
+.sidebar-student-list.collapsed {
+  width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  border-right: 1px solid transparent;
+  overflow: hidden;
+}
+
+.btn-icon {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-icon:hover {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
 }
 
 .editor-main-area {
@@ -1135,11 +1206,11 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: 4px;
   background-color: var(--bg-primary);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
