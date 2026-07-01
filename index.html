@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>생활기록부 스마트 점검 프로그램</title>
+  <!-- Pretendard Web Font CDN -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+  <link rel="stylesheet" href="style.css">
+  <!-- SheetJS CDN (Excel parsing and exporting) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <div id="app-container">
+    
+    <!-- Sidebar Navigation (Notion style) -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-logo">📝</span>
+        <span class="sidebar-title">생기부 점검기</span>
+      </div>
+      
+      <nav class="sidebar-menu">
+        <div class="menu-item active" data-tab="data-management">
+          <i data-lucide="database"></i>
+          <span>데이터 관리</span>
+        </div>
+        <div class="menu-item" data-tab="settings">
+          <i data-lucide="settings"></i>
+          <span>점검 규칙 설정</span>
+        </div>
+        <div class="menu-item" data-tab="student-group-view">
+          <i data-lucide="users"></i>
+          <span>학생별 확인</span>
+        </div>
+        <div class="menu-item" data-tab="subject-group-view">
+          <i data-lucide="book-open"></i>
+          <span>과목별 확인</span>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <p>생활기록부 점검 v1.0</p>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+      
+      <!-- Page Header -->
+      <header class="page-header">
+        <h2 class="page-title" id="current-page-title">
+          <i data-lucide="database"></i>
+          <span>데이터 관리</span>
+        </h2>
+        <div class="page-actions" id="header-actions">
+          <!-- Contextual buttons will load here -->
+        </div>
+      </header>
+
+      <!-- TAB 1: DATA MANAGEMENT -->
+      <div id="data-management" class="tab-content active">
+        <div class="data-tab-wrapper">
+          
+          <!-- Statistics Widget Dashboard -->
+          <div class="dashboard-summary">
+            <div class="summary-card">
+              <span class="summary-label">전체 학생 수</span>
+              <span class="summary-value" id="stats-total-students">0</span>
+            </div>
+            <div class="summary-card">
+              <span class="summary-label">전체 기록(행) 수</span>
+              <span class="summary-value" id="stats-checked-students">0</span>
+            </div>
+            <div class="summary-card">
+              <span class="summary-label">검출된 오류 수</span>
+              <span class="summary-value" id="stats-total-errors">0</span>
+            </div>
+            <div class="summary-card">
+              <span class="summary-label">기재 금지 위반 수</span>
+              <span class="summary-value" id="stats-forbidden-errors">0</span>
+            </div>
+          </div>
+
+          <!-- Excel Drag & Drop Upload Zone -->
+          <div class="upload-zone" id="excel-upload-zone">
+            <i data-lucide="upload-cloud"></i>
+            <h3>엑셀(XLSX / CSV) 파일 업로드</h3>
+            <p>여기로 파일을 드래그하거나 클릭하여 파일을 선택해 주세요.</p>
+            <p style="font-size: 11px; margin-top: 8px; color: var(--text-light);">
+              (학년도, 학기, 학번, 이름, 과목명, 내용 항목이 포함된 엑셀을 업로드하세요)
+            </p>
+          </div>
+
+          <!-- Table Controls (Search, Add Row, Sample Download) -->
+          <div class="table-controls">
+            <div class="search-box">
+              <i data-lucide="search"></i>
+              <input type="text" id="student-search-input" placeholder="이름, 학번, 과목 검색...">
+            </div>
+            
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-danger" id="btn-delete-selected" style="display: none; background-color: var(--color-spelling-bg); color: var(--color-spelling-text); border-color: rgba(212,64,39,0.15);">
+                <i data-lucide="trash-2"></i>
+                <span>선택 삭제</span>
+              </button>
+              <button class="btn" id="btn-download-sample">
+                <i data-lucide="download"></i>
+                <span>샘플 양식 다운로드</span>
+              </button>
+              <button class="btn btn-secondary" id="btn-add-row">
+                <i data-lucide="plus"></i>
+                <span>학생 추가</span>
+              </button>
+              <button class="btn btn-primary" id="btn-inspect-all-nav">
+                <i data-lucide="sparkles"></i>
+                <span>일괄 분석 시작</span>
+              </button>
+              <button class="btn" id="btn-export-excel" style="display: none;">
+                <i data-lucide="file-output"></i>
+                <span>점검 완료 엑셀 저장</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Notion-like Filter & Sort Toolbar -->
+          <div class="filter-toolbar" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 0; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); font-size: 13px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="filter" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
+              <span style="font-weight: 600; color: var(--text-secondary);">필터:</span>
+            </div>
+            
+            <select id="filter-year" class="editor-input" style="padding: 3px 8px; font-size: 12px; height: 28px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; color: var(--text-primary);">
+              <option value="all">학년: 전체</option>
+            </select>
+            
+            <select id="filter-class" class="editor-input" style="padding: 3px 8px; font-size: 12px; height: 28px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; color: var(--text-primary);">
+              <option value="all">반: 전체</option>
+            </select>
+
+            <select id="filter-subject" class="editor-input" style="padding: 3px 8px; font-size: 12px; height: 28px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; color: var(--text-primary);">
+              <option value="all">과목/활동: 전체</option>
+            </select>
+
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="arrow-up-down" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
+              <span style="font-weight: 600; color: var(--text-secondary);">정렬:</span>
+              <select id="sort-criteria" class="editor-input" style="padding: 3px 8px; font-size: 12px; height: 28px; width: 145px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; color: var(--text-primary);">
+                <option value="sNum-asc">학번 순 (오름차순)</option>
+                <option value="sNum-desc">학번 순 (내림차순)</option>
+                <option value="name-asc">이름 순</option>
+                <option value="subject-asc">과목 순</option>
+                <option value="errors-desc">오류 많은 순</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Excel Database Grid -->
+          <div class="table-wrapper">
+            <table class="notion-table">
+              <thead>
+                <tr>
+                  <th style="width: 30px; text-align: center;"><input type="checkbox" id="th-select-all"></th>
+                  <th style="width: 50px;">구분</th>
+                  <th style="width: 70px;">학년도</th>
+                  <th style="width: 50px;">학기</th>
+                  <th style="width: 80px;">학번</th>
+                  <th style="width: 90px;">이름</th>
+                  <th style="width: 120px;">과목명 / 주제명</th>
+                  <th>내용 (생활기록부 세부 특기사항)</th>
+                  <th style="width: 120px;">검출 오류</th>
+                  <th style="width: 80px;">작업</th>
+                </tr>
+              </thead>
+              <tbody id="student-table-body">
+                <tr>
+                  <td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 32px 0;">
+                    <i data-lucide="info" style="vertical-align: middle; margin-right: 4px; display: inline-block;"></i>
+                    등록된 학생 데이터가 없습니다. 직접 추가하거나 엑셀 파일을 업로드해 주세요.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="pagination-bar" style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--text-secondary);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>페이지당 표시 행 수:</span>
+              <select id="select-rows-per-page" class="editor-input" style="padding: 2px 6px; font-size: 12px; height: 26px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; color: var(--text-primary);">
+                <option value="20">20개</option>
+                <option value="30" selected>30개</option>
+                <option value="50">50개</option>
+                <option value="100">100개</option>
+              </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <button class="btn btn-secondary" id="btn-prev-page" style="padding: 2px 8px; font-size: 12px; height: 26px;">
+                <i data-lucide="chevron-left" style="width:12px; height:12px; vertical-align: middle;"></i>
+                <span style="vertical-align: middle;">이전</span>
+              </button>
+              <span id="txt-page-info" style="font-weight: 500;">1 / 1 페이지</span>
+              <button class="btn btn-secondary" id="btn-next-page" style="padding: 2px 8px; font-size: 12px; height: 26px;">
+                <span style="vertical-align: middle;">다음</span>
+                <i data-lucide="chevron-right" style="width:12px; height:12px; vertical-align: middle;"></i>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- TAB 2: STUDENT GROUP VIEW (점검 에디터 통합) -->
+      <div id="student-group-view" class="tab-content">
+        <div class="split-container">
+          
+          <!-- 좌측: 대상 학생 명부 사이드바 (320px) -->
+          <div class="sidebar-student-list">
+            <div style="padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 700; font-size: 14px; color: var(--text-primary);">대상 학생 <span id="editor-student-count" style="color: var(--color-slang-text); font-weight:700;">0</span>명</span>
+              </div>
+              
+              <!-- 학생 이름 검색 -->
+              <div class="search-box" style="margin-top: 4px;">
+                <i data-lucide="search"></i>
+                <input type="text" id="editor-student-search" placeholder="학생 이름 검색..." style="font-size:12px;">
+              </div>
+              
+              <!-- 학년/반 단일 필터 콤보 -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
+                <select id="editor-student-filter-year" class="editor-input" style="padding: 3px 8px; font-size: 12px; height: 28px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; color: var(--text-primary);">
+                  <option value="all">전체 학년</option>
+                </select>
+                <select id="editor-student-filter-class" class="editor-input" style="padding: 3px 8px; font-size: 12px; height: 28px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; color: var(--text-primary);">
+                  <option value="all">전체 반</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- 세로 학생 리스트 (스크롤) -->
+            <div id="editor-student-list-container" style="flex: 1; overflow-y: auto; padding: 8px 12px;">
+              <!-- 학생 아이템들이 동적으로 빌드됨 -->
+            </div>
+          </div>
+
+          <!-- 우측: 에디터 및 오류 검사 영역 -->
+          <div class="editor-main-area">
+            
+            <!-- 대기 상태 (선택된 학생이 없을 때 표시) -->
+            <div id="editor-empty-state" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-secondary); text-align: center; padding: 32px;">
+              <i data-lucide="file-search" style="width: 48px; height: 48px; color: var(--border-focus); margin-bottom: 12px;"></i>
+              <h4 style="font-weight:600; margin-bottom: 8px; color: var(--text-primary);">선택된 학생 없음</h4>
+              <p style="font-size: 13px; max-width: 320px;">좌측 명부에서 작성 및 점검할 학생을 선택해 주세요.</p>
+            </div>
+
+            <!-- 실제 편집 본문 (학생 선택 시 활성화) -->
+            <div id="editor-active-container" class="inspection-container" style="display: none;">
+              
+              <!-- Left side: Content Editor -->
+              <div class="editor-panel">
+                <div class="student-selector-bar">
+                  <div class="student-info-tag">
+                    <strong id="current-student-name" style="font-size:16px;">학생 선택 없음</strong>
+                    <span id="current-student-meta" style="font-size: 12px; color: var(--text-secondary); margin-left: 8px;"></span>
+                  </div>
+                  <!-- 이전/다음 학생 이동(보조 네비게이션) -->
+                  <div class="student-nav-buttons">
+                    <button class="btn btn-secondary" id="btn-prev-student" style="padding: 4px 8px; height: 30px;">
+                      <i data-lucide="chevron-left" style="width:14px; height:14px;"></i>
+                    </button>
+                    <button class="btn btn-secondary" id="btn-next-student" style="padding: 4px 8px; height: 30px;">
+                      <i data-lucide="chevron-right" style="width:14px; height:14px;"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Editor Fields (Readonly Meta + Editable Textarea) -->
+                <div class="editor-body-wrapper" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px;">
+                  <div class="editor-field-group" style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
+                    <span class="editor-label" style="width: 80px; flex-shrink: 0; font-weight: 600; font-size: 13px;">과목 / 활동명</span>
+                    
+                    <!-- 교과 선택 드롭다운 -->
+                    <select id="editor-subject-select" class="editor-input" style="flex: 1; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; padding: 4px 8px; font-size:13px; height:32px; font-family: inherit; color: var(--text-primary);">
+                      <!-- 데이터 과목 목록 + [직접 입력...] -->
+                    </select>
+
+                    <!-- 직접 입력용 인풋 -->
+                    <input type="text" id="editor-subject-direct-input" class="editor-input" style="display: none; flex: 1; height:32px; font-size:13px;" placeholder="과목명을 직접 입력하세요">
+                  </div>
+
+                  <!-- Highlighting Textarea -->
+                  <div class="editor-text-container" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; margin-bottom: 12px;">
+                    <div id="editable-content" class="editor-textarea" contenteditable="true" spellcheck="false" style="flex: 1; overflow-y: auto; outline: none; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; font-size:14px; line-height: 1.6; background-color: var(--bg-primary); min-height: 200px;"></div>
+                  </div>
+
+                  <!-- Footer with Byte Counter -->
+                  <div class="editor-footer" style="flex-shrink: 0;">
+                    <span style="font-size: 11px; color: var(--text-light);">* 본문 강조 단어를 클릭하면 우측 카드로 바로 이동합니다.</span>
+                    <div class="byte-counter">
+                      <span>글자 수: <strong id="char-count">0</strong>자</span>
+                      <span>NEIS 바이트: <strong id="byte-count" class="byte-badge">0</strong> / 1500 Byte</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right side: Error Inspection Results Panel -->
+              <div class="results-panel" style="width: 320px; flex-shrink: 0; border-left: 1px solid var(--border-color); display: flex; flex-direction: column;">
+                <div class="results-header">
+                  <div class="results-title">
+                    <i data-lucide="alert-circle"></i>
+                    <span>발견된 오류 및 건의사항</span>
+                    <span class="results-count-badge" id="errors-count-badge">0</span>
+                  </div>
+                  <button class="btn btn-primary" id="btn-apply-all-fixes" style="padding: 4px 8px; font-size: 12px;">
+                    <i data-lucide="sparkles"></i>
+                    <span>모든 제안 적용</span>
+                  </button>
+                </div>
+
+                <div class="results-list" id="inspection-results-list" style="flex: 1; overflow-y: auto;">
+                  <!-- Result cards will render here -->
+                  <div class="empty-state">
+                    <i data-lucide="check-circle"></i>
+                    <h4>검출된 오류 없음</h4>
+                    <p>맞춤법 및 기재 지침에 어긋나는 오류가 발견되지 않았습니다.</p>
+                  </div>
+                </div>
+              </div>
+
+            </div> <!-- editor-active-container 닫힘 -->
+          </div> <!-- editor-main-area 닫힘 -->
+        </div> <!-- split-container 닫힘 -->
+      </div> <!-- inspection-editor 탭 닫힘 -->
+
+      <!-- TAB 3: SETTINGS -->
+      <div id="settings" class="tab-content">
+        <div class="settings-tab-wrapper">
+          
+          <!-- Inspection Rules Toggle -->
+          <div class="settings-section">
+            <h4 class="settings-section-title">
+              <i data-lucide="shield-check"></i>
+              <span>활성화할 점검 규칙</span>
+            </h4>
+            
+            <div class="toggle-item">
+              <div class="toggle-details">
+                <h5>맞춤법 및 흔한 오탈자 점검</h5>
+                <p>생기부 다빈도 오탈자(역활, 됬다, 무난하다 등)를 감지합니다.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setting-spelling" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-item">
+              <div class="toggle-details">
+                <h5>비표준어 및 청소년 은어 사용 금지</h5>
+                <p>킹받다, 개이득, 잼민이 등 격식 없는 은어 및 유행어를 점검합니다.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setting-slang" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-item">
+              <div class="toggle-details">
+                <h5>외래어 표기 교정</h5>
+                <p>시물레이션 -> 시뮬레이션 등 잘못 표기된 외래어를 찾습니다.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setting-loanword" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-item">
+              <div class="toggle-details">
+                <h5>연속 띄어쓰기 점검</h5>
+                <p>2개 이상 연속으로 입력된 불필요한 공백을 1개로 줄입니다.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setting-spacing" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-item">
+              <div class="toggle-details">
+                <h5>문장 종결 온점(.) 점검</h5>
+                <p>각 문장의 끝이 마침표(.)로 끝나지 않은 오류를 체크합니다.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setting-endingDot" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-item">
+              <div class="toggle-details">
+                <h5>생기부 기재 금지 키워드 필터링</h5>
+                <p>어학성적(토익 등), 교외대회 수상실적, 사설기관 언급을 제한합니다.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setting-forbidden" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-item">
+              <div class="toggle-details">
+                <h5>학생 본인 실명 노출 주의</h5>
+                <p>본문에 학생 실명이 직접 들어갔는지 검사하여 대체 명칭을 권고합니다.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="setting-nameCheck" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Custom User Dictionary -->
+          <div class="settings-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h4 class="settings-section-title" style="margin-bottom: 0;">
+                <i data-lucide="book-open"></i>
+                <span>나만의 단어 사전 (예외 및 직접 추가)</span>
+              </h4>
+              <button class="btn" id="btn-add-dict-row">
+                <i data-lucide="plus"></i>
+                <span>사전 항목 추가</span>
+              </button>
+            </div>
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
+              사용자가 추가한 단어들은 기재 지침 점검 시 우선 반영됩니다. 대체어 칸을 비워두면(또는 예외 처리하면) 기본 사전의 오류 목록에서 예외로 제외됩니다.
+            </p>
+
+            <div class="dictionary-grid" id="custom-dictionary-list">
+              <div class="dictionary-row" style="font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+                <span>찾을 단어 (오류 단어)</span>
+                <span>대체할 단어 (제안)</span>
+                <span>이유 / 설명</span>
+                <span style="width: 28px;"></span>
+              </div>
+              <!-- Rows will be dynamically added here -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- TAB 5: SUBJECT GROUP VIEW -->
+      <div id="subject-group-view" class="tab-content">
+        <div class="data-tab-wrapper">
+          <div class="results-header" style="background: none; border-bottom: 1px solid var(--border-color); padding: 0 0 12px 0; margin-bottom: 16px;">
+            <div class="results-title">
+              <i data-lucide="book-open"></i>
+              <span>교과 과목별 세부 특기사항 확인</span>
+            </div>
+            <span style="font-size:12px; color:var(--text-secondary);">* 과목을 펼쳐 학생들을 확인하고, 학생 카드를 누르면 수정 에디터로 즉시 점프합니다.</span>
+          </div>
+
+          <div id="subject-hierarchy-tree" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- 과목 -> 학생/내용 요약 카드가 동적으로 빌드됨 -->
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Hidden Excel Input Element -->
+  <input type="file" id="excel-file-input" style="display: none;" accept=".xlsx, .xls, .csv">
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <script src="checker.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
