@@ -12,6 +12,12 @@ function createWindow() {
     minHeight: 700,
     title: "생활기록부 스마트 점검 프로그램",
     icon: path.join(__dirname, 'icon.png'), // 아이콘이 있으면 로드 (없어도 무방)
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#ffffff',
+      symbolColor: '#37352f',
+      height: 40
+    },
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -31,7 +37,7 @@ function createWindow() {
   });
 
   // 개발자 도구를 엽니다 (개발 시 확인용, 필요한 경우 해제 가능)
-  // mainWindow.webContents.openDevTools();
+  mainWindow.webContents.openDevTools();
 
   mainWindow.on('closed', function () {
     mainWindow = null;

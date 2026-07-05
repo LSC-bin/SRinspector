@@ -8,7 +8,7 @@
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
   <link rel="stylesheet" href="style.css">
   <!-- SheetJS CDN (Excel parsing and exporting) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
@@ -33,10 +33,6 @@
           <i data-lucide="database"></i>
           <span>데이터 관리</span>
         </div>
-        <div class="menu-item" data-tab="settings">
-          <i data-lucide="settings"></i>
-          <span>점검 규칙 설정</span>
-        </div>
         <div class="menu-item" data-tab="student-group-view">
           <i data-lucide="users"></i>
           <span>학생별 확인</span>
@@ -44,6 +40,10 @@
         <div class="menu-item" data-tab="subject-group-view">
           <i data-lucide="book-open"></i>
           <span>과목별 확인</span>
+        </div>
+        <div class="menu-item" data-tab="settings">
+          <i data-lucide="settings"></i>
+          <span>점검 규칙 설정</span>
         </div>
       </nav>
 
@@ -114,7 +114,7 @@
               </button>
               <button class="btn" id="btn-download-sample">
                 <i data-lucide="download"></i>
-                <span>샘플 양식 다운로드</span>
+                <span>양식 다운로드</span>
               </button>
               <button class="btn btn-secondary" id="btn-add-row">
                 <i data-lucide="plus"></i>
@@ -122,11 +122,15 @@
               </button>
               <button class="btn btn-primary" id="btn-inspect-all-nav">
                 <i data-lucide="sparkles"></i>
-                <span>일괄 분석 시작</span>
+                <span>일괄 분석</span>
               </button>
-              <button class="btn" id="btn-export-excel" style="display: none;">
+              <button class="btn" id="btn-export-errors-excel" style="background-color: var(--color-slang-bg); color: var(--color-slang-text); border-color: rgba(179,89,0,0.15);">
+                <i data-lucide="file-warning"></i>
+                <span>수정 요청 다운로드</span>
+              </button>
+              <button class="btn" id="btn-export-excel">
                 <i data-lucide="file-output"></i>
-                <span>점검 완료 엑셀 저장</span>
+                <span>엑셀 저장</span>
               </button>
             </div>
           </div>
@@ -200,6 +204,7 @@
                 <option value="30" selected>30개</option>
                 <option value="50">50개</option>
                 <option value="100">100개</option>
+                <option value="all">모두 보기</option>
               </select>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -247,8 +252,16 @@
                   <option value="all">전체 반</option>
                 </select>
               </div>
+              
+              <!-- 오류 감출 학생 필터 체크박스 -->
+              <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 2px 4px;">
+                <input type="checkbox" id="editor-student-filter-error-only" style="cursor: pointer; width: 14px; height: 14px;">
+                <label for="editor-student-filter-error-only" style="font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; font-weight: 500;">
+                  오류 검출된 학생만 보기
+                </label>
+              </div>
             </div>
-            
+
             <!-- 세로 학생 리스트 (스크롤) -->
             <div id="editor-student-list-container" style="flex: 1; overflow-y: auto; padding: 6px;">
               <!-- 학생 아이템들이 동적으로 빌드됨 -->
@@ -270,7 +283,7 @@
               
               <!-- Left side: Content Editor -->
               <div class="editor-panel">
-                <div class="student-selector-bar">
+                <div class="student-selector-bar" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                   <div class="student-info-tag" style="display: flex; align-items: center;">
                     <button id="btn-expand-student-list" class="btn-icon" title="목록 펼치기" style="display: none; border: none; background: none; padding: 5px; cursor: pointer; color: var(--text-secondary); border-radius: 4px; align-items: center; justify-content: center; margin-right: 8px; border: 1px solid var(--border-color); background-color: var(--bg-secondary);">
                       <i data-lucide="chevrons-right" style="width: 16px; height: 16px;"></i>
@@ -278,13 +291,18 @@
                     <strong id="current-student-name" style="font-size:16px;">학생 선택 없음</strong>
                     <span id="current-student-meta" style="font-size: 12px; color: var(--text-secondary); margin-left: 8px;"></span>
                   </div>
-                  <!-- 이전/다음 학생 이동(보조 네비게이션) -->
-                  <div class="student-nav-buttons">
-                    <button class="btn btn-secondary" id="btn-prev-student" style="padding: 4px 8px; height: 30px;">
-                      <i data-lucide="chevron-left" style="width:14px; height:14px;"></i>
-                    </button>
-                    <button class="btn btn-secondary" id="btn-next-student" style="padding: 4px 8px; height: 30px;">
-                      <i data-lucide="chevron-right" style="width:14px; height:14px;"></i>
+                  <!-- 이전/다음 학생 이동 및 결과 펼치기 버튼 영역 -->
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="student-nav-buttons" style="display: flex; gap: 4px;">
+                      <button class="btn btn-secondary" id="btn-prev-student" style="padding: 4px 8px; height: 30px; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="chevron-left" style="width:14px; height:14px;"></i>
+                      </button>
+                      <button class="btn btn-secondary" id="btn-next-student" style="padding: 4px 8px; height: 30px; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="chevron-right" style="width:14px; height:14px;"></i>
+                      </button>
+                    </div>
+                    <button id="btn-expand-results-panel" class="btn-icon" title="결과 펼치기" style="display: none; border: none; background: none; padding: 5px; cursor: pointer; color: var(--text-secondary); border-radius: 4px; align-items: center; justify-content: center; border: 1px solid var(--border-color); background-color: var(--bg-secondary); height: 30px; width: 30px;">
+                      <i data-lucide="chevrons-left" style="width: 16px; height: 16px;"></i>
                     </button>
                   </div>
                 </div>
@@ -292,21 +310,21 @@
                 <!-- Editor Fields (Readonly Meta + Editable Textarea) -->
                 <div class="editor-body-wrapper" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px;">
                   <div class="editor-field-group" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
-                    <span class="editor-label" style="width: 80px; flex-shrink: 0; font-weight: 600; font-size: 13px;">과목 / 활동명</span>
+                    <span class="editor-label" style="width: 80px; flex-shrink: 0; font-weight: 600; font-size: 13px;">怨쇰ぉ / ?쒕룞紐?/span>
                     
-                    <!-- 교과 선택 드롭다운 -->
+                    <!-- 援먭낵 ?좏깮 ?쒕∼?ㅼ슫 -->
                     <select id="editor-subject-select" class="editor-input" style="flex: 1; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; padding: 4px 8px; font-size:13px; height:32px; font-family: inherit; color: var(--text-primary);">
-                      <!-- 데이터 과목 목록 + [직접 입력...] -->
+                      <!-- ?곗씠??怨쇰ぉ 紐⑸줉 + [吏곸젒 ?낅젰...] -->
                     </select>
 
-                    <!-- 직접 입력용 인풋 -->
-                    <input type="text" id="editor-subject-direct-input" class="editor-input" style="display: none; flex: 1; height:32px; font-size:13px;" placeholder="과목명을 직접 입력하세요">
+                    <!-- 吏곸젒 ?낅젰???명뭼 -->
+                    <input type="text" id="editor-subject-direct-input" class="editor-input" style="display: none; flex: 1; height:32px; font-size:13px;" placeholder="怨쇰ぉ紐낆쓣 吏곸젒 ?낅젰?섏꽭??>
                   </div>
 
-                  <!-- 담당 교사 입력 필드 -->
+                  <!-- ?대떦 援먯궗 ?낅젰 ?꾨뱶 -->
                   <div class="editor-field-group" style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
-                    <span class="editor-label" style="width: 80px; flex-shrink: 0; font-weight: 600; font-size: 13px;">담당 교사</span>
-                    <input type="text" id="editor-teacher-input" class="editor-input" style="flex: 1; height:32px; font-size:13px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; padding: 4px 8px; font-family: inherit; color: var(--text-primary);" placeholder="담당 교사명을 입력하세요 (예: 김국어)">
+                    <span class="editor-label" style="width: 80px; flex-shrink: 0; font-weight: 600; font-size: 13px;">?대떦 援먯궗</span>
+                    <input type="text" id="editor-teacher-input" class="editor-input" style="flex: 1; height:32px; font-size:13px; border: 1px solid var(--border-color); background-color: var(--bg-primary); border-radius: 4px; padding: 4px 8px; font-family: inherit; color: var(--text-primary);" placeholder="?대떦 援먯궗紐낆쓣 ?낅젰?섏꽭??(?? 源援?뼱)">
                   </div>
 
                   <!-- Highlighting Textarea -->
@@ -314,20 +332,20 @@
                     <div id="editable-content" class="editor-textarea" contenteditable="true" spellcheck="false" style="flex: 1; overflow-y: auto; outline: none; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px; font-size:14px; line-height: 1.6; background-color: var(--bg-primary); min-height: 200px;"></div>
                   </div>
 
-                  <!-- 수정 요청사항 메신저 복사 액션 영역 -->
+                  <!-- ?섏젙 ?붿껌?ы빆 硫붿떊? 蹂듭궗 ?≪뀡 ?곸뿭 -->
                   <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-shrink: 0;">
                     <button id="btn-copy-request-message" class="btn btn-primary" style="flex: 1; justify-content: center; height: 38px; font-size: 13px; font-weight: 600; gap: 8px;">
                       <i data-lucide="send" style="width: 15px; height: 15px;"></i>
-                      담당 선생님께 전송할 수정 요청 사항 복사
+                      ?대떦 ?좎깮?섍퍡 ?꾩넚???섏젙 ?붿껌 ?ы빆 蹂듭궗
                     </button>
                   </div>
 
                   <!-- Footer with Byte Counter -->
                   <div class="editor-footer" style="flex-shrink: 0;">
-                    <span style="font-size: 11px; color: var(--text-light);">* 본문 강조 단어를 클릭하면 우측 카드로 바로 이동합니다.</span>
+                    <span style="font-size: 11px; color: var(--text-light);">* 蹂몃Ц 媛뺤“ ?⑥뼱瑜??대┃?섎㈃ ?곗륫 移대뱶濡?諛붾줈 ?대룞?⑸땲??</span>
                     <div class="byte-counter">
-                      <span>글자 수: <strong id="char-count">0</strong>자</span>
-                      <span>NEIS 바이트: <strong id="byte-count" class="byte-badge">0</strong> / 1500 Byte</span>
+                      <span>湲???? <strong id="char-count">0</strong>??/span>
+                      <span>NEIS 諛붿씠?? <strong id="byte-count" class="byte-badge">0</strong> / 1500 Byte</span>
                     </div>
                   </div>
                 </div>
@@ -338,39 +356,29 @@
                 <div class="results-header">
                   <div class="results-title">
                     <i data-lucide="alert-circle"></i>
-                    <span>발견된 오류 및 건의사항</span>
+                    <span>諛쒓껄???ㅻ쪟 諛?嫄댁쓽?ы빆</span>
                     <span class="results-count-badge" id="errors-count-badge">0</span>
                   </div>
                   <button class="btn btn-primary" id="btn-apply-all-fixes" style="padding: 4px 8px; font-size: 12px;">
                     <i data-lucide="sparkles"></i>
-                    <span>모든 제안 적용</span>
+                    <span>紐⑤뱺 ?쒖븞 ?곸슜</span>
                   </button>
                 </div>
-
-                <!-- AI General Feedback Block -->
-                <div id="ai-general-feedback" style="display: none; padding: 12px; margin: 12px 12px 0 12px; background-color: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
-                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-                    <i data-lucide="message-square" style="width: 14px; height: 14px; color: var(--color-primary);"></i>
-                    <strong style="font-size: 13px; color: var(--text-primary);">AI 총평</strong>
-                  </div>
-                  <div id="ai-general-feedback-text" style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;"></div>
-                </div>
-
 
                 <div class="results-list" id="inspection-results-list" style="flex: 1; overflow-y: auto;">
                   <!-- Result cards will render here -->
                   <div class="empty-state">
                     <i data-lucide="check-circle"></i>
-                    <h4>검출된 오류 없음</h4>
-                    <p>맞춤법 및 기재 지침에 어긋나는 오류가 발견되지 않았습니다.</p>
+                    <h4>寃異쒕맂 ?ㅻ쪟 ?놁쓬</h4>
+                    <p>留욎땄踰?諛?湲곗옱 吏移⑥뿉 ?닿툔?섎뒗 ?ㅻ쪟媛 諛쒓껄?섏? ?딆븯?듬땲??</p>
                   </div>
                 </div>
               </div>
 
-            </div> <!-- editor-active-container 닫힘 -->
-          </div> <!-- editor-main-area 닫힘 -->
-        </div> <!-- split-container 닫힘 -->
-      </div> <!-- inspection-editor 탭 닫힘 -->
+            </div> <!-- editor-active-container ?ロ옒 -->
+          </div> <!-- editor-main-area ?ロ옒 -->
+        </div> <!-- split-container ?ロ옒 -->
+      </div> <!-- inspection-editor ???ロ옒 -->
 
       <!-- TAB 3: SETTINGS -->
       <div id="settings" class="tab-content">
@@ -380,13 +388,13 @@
           <div class="settings-section">
             <h4 class="settings-section-title">
               <i data-lucide="shield-check"></i>
-              <span>활성화할 점검 규칙</span>
+              <span>?쒖꽦?뷀븷 ?먭? 洹쒖튃</span>
             </h4>
             
             <div class="toggle-item">
               <div class="toggle-details">
-                <h5>맞춤법 및 흔한 오탈자 점검</h5>
-                <p>생기부 다빈도 오탈자(역활, 됬다, 무난하다 등)를 감지합니다.</p>
+                <h5>留욎땄踰?諛??뷀븳 ?ㅽ깉???먭?</h5>
+                <p>?앷린遺 ?ㅻ퉰???ㅽ깉????솢, ?щ떎, 臾대궃?섎떎 ??瑜?媛먯??⑸땲??</p>
               </div>
               <label class="switch">
                 <input type="checkbox" id="setting-spelling" checked>
@@ -396,8 +404,8 @@
 
             <div class="toggle-item">
               <div class="toggle-details">
-                <h5>비표준어 및 청소년 은어 사용 금지</h5>
-                <p>킹받다, 개이득, 잼민이 등 격식 없는 은어 및 유행어를 점검합니다.</p>
+                <h5>鍮꾪몴以??諛?泥?냼??????ъ슜 湲덉?</h5>
+                <p>?밸컺?? 媛쒖씠?? ?쇰?????寃⑹떇 ?녿뒗 ???諛??좏뻾?대? ?먭??⑸땲??</p>
               </div>
               <label class="switch">
                 <input type="checkbox" id="setting-slang" checked>
@@ -407,8 +415,8 @@
 
             <div class="toggle-item">
               <div class="toggle-details">
-                <h5>외래어 표기 교정</h5>
-                <p>시물레이션 -> 시뮬레이션 등 잘못 표기된 외래어를 찾습니다.</p>
+                <h5>?몃옒???쒓린 援먯젙</h5>
+                <p>?쒕Ъ?덉씠??-> ?쒕??덉씠?????섎せ ?쒓린???몃옒?대? 李얠뒿?덈떎.</p>
               </div>
               <label class="switch">
                 <input type="checkbox" id="setting-loanword" checked>
@@ -418,8 +426,8 @@
 
             <div class="toggle-item">
               <div class="toggle-details">
-                <h5>연속 띄어쓰기 점검</h5>
-                <p>2개 이상 연속으로 입력된 불필요한 공백을 1개로 줄입니다.</p>
+                <h5>?곗냽 ?꾩뼱?곌린 ?먭?</h5>
+                <p>2媛??댁긽 ?곗냽?쇰줈 ?낅젰??遺덊븘?뷀븳 怨듬갚??1媛쒕줈 以꾩엯?덈떎.</p>
               </div>
               <label class="switch">
                 <input type="checkbox" id="setting-spacing" checked>
@@ -429,8 +437,8 @@
 
             <div class="toggle-item">
               <div class="toggle-details">
-                <h5>문장 종결 온점(.) 점검</h5>
-                <p>각 문장의 끝이 마침표(.)로 끝나지 않은 오류를 체크합니다.</p>
+                <h5>臾몄옣 醫낃껐 ?⑥젏(.) ?먭?</h5>
+                <p>媛?臾몄옣???앹씠 留덉묠??.)濡??앸굹吏 ?딆? ?ㅻ쪟瑜?泥댄겕?⑸땲??</p>
               </div>
               <label class="switch">
                 <input type="checkbox" id="setting-endingDot" checked>
@@ -440,8 +448,8 @@
 
             <div class="toggle-item">
               <div class="toggle-details">
-                <h5>생기부 기재 금지 키워드 필터링</h5>
-                <p>어학성적(토익 등), 교외대회 수상실적, 사설기관 언급을 제한합니다.</p>
+                <h5>?앷린遺 湲곗옱 湲덉? ?ㅼ썙???꾪꽣留?/h5>
+                <p>?댄븰?깆쟻(?좎씡 ??, 援먯쇅????섏긽?ㅼ쟻, ?ъ꽕湲곌? ?멸툒???쒗븳?⑸땲??</p>
               </div>
               <label class="switch">
                 <input type="checkbox" id="setting-forbidden" checked>
@@ -451,8 +459,8 @@
 
             <div class="toggle-item">
               <div class="toggle-details">
-                <h5>학생 본인 실명 노출 주의</h5>
-                <p>본문에 학생 실명이 직접 들어갔는지 검사하여 대체 명칭을 권고합니다.</p>
+                <h5>?숈깮 蹂몄씤 ?ㅻ챸 ?몄텧 二쇱쓽</h5>
+                <p>蹂몃Ц???숈깮 ?ㅻ챸??吏곸젒 ?ㅼ뼱媛붾뒗吏 寃?ы븯???泥?紐낆묶??沅뚭퀬?⑸땲??</p>
               </div>
               <label class="switch">
                 <input type="checkbox" id="setting-nameCheck" checked>
@@ -466,22 +474,22 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
               <h4 class="settings-section-title" style="margin-bottom: 0;">
                 <i data-lucide="book-open"></i>
-                <span>나만의 단어 사전 (예외 및 직접 추가)</span>
+                <span>?섎쭔???⑥뼱 ?ъ쟾 (?덉쇅 諛?吏곸젒 異붽?)</span>
               </h4>
               <button class="btn" id="btn-add-dict-row">
                 <i data-lucide="plus"></i>
-                <span>사전 항목 추가</span>
+                <span>?ъ쟾 ??ぉ 異붽?</span>
               </button>
             </div>
             <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
-              사용자가 추가한 단어들은 기재 지침 점검 시 우선 반영됩니다. 대체어 칸을 비워두면(또는 예외 처리하면) 기본 사전의 오류 목록에서 예외로 제외됩니다.
+              ?ъ슜?먭? 異붽????⑥뼱?ㅼ? 湲곗옱 吏移??먭? ???곗꽑 諛섏쁺?⑸땲?? ?泥댁뼱 移몄쓣 鍮꾩썙?먮㈃(?먮뒗 ?덉쇅 泥섎━?섎㈃) 湲곕낯 ?ъ쟾???ㅻ쪟 紐⑸줉?먯꽌 ?덉쇅濡??쒖쇅?⑸땲??
             </p>
 
             <div class="dictionary-grid" id="custom-dictionary-list">
               <div class="dictionary-row" style="font-weight: 600; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
-                <span>찾을 단어 (오류 단어)</span>
-                <span>대체할 단어 (제안)</span>
-                <span>이유 / 설명</span>
+                <span>李얠쓣 ?⑥뼱 (?ㅻ쪟 ?⑥뼱)</span>
+                <span>?泥댄븷 ?⑥뼱 (?쒖븞)</span>
+                <span>?댁쑀 / ?ㅻ챸</span>
                 <span style="width: 28px;"></span>
               </div>
               <!-- Rows will be dynamically added here -->
@@ -504,7 +512,7 @@
                 <p>Gemini API를 활용하여 문맥 기반 정밀 생기부 검사를 함께 수행합니다.</p>
               </div>
               <label class="switch">
-                <input type="checkbox" id="setting-aiEnabled">
+                <input type="checkbox" id="setting-ai-enabled">
                 <span class="slider"></span>
               </label>
             </div>
@@ -523,6 +531,19 @@
             </div>
           </div>
 
+
+
+        </div>
+      </div>
+
+
+      
+            
+            <div style="margin-top: 10px; padding: 8px 12px; background-color: var(--bg-secondary); border-left: 3px solid var(--color-slang-text); border-radius: 0 4px 4px 0; font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+              💡 <b>[필독] 404 (Not Found) 오류 발생 시 자가 조치법</b><br>
+              구글 AI Studio에서 API 키를 만드실 때, 기존 프로젝트가 아닌 <b>[새 프로젝트에서 API 키 만들기 (Create API key in new project)]</b>를 클릭하여 완전 새로운 프로젝트의 키를 생성해 등록해 주세요. 기존 기본 프로젝트(Default Gemini Project)에 권한 꼬임이 있을 때 발생하는 구글 클라우드 고유의 차단 버그를 100% 즉시 해결해 줍니다.
+            </div>
+          </div>
 
         </div>
       </div>

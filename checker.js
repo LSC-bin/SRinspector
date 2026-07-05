@@ -105,7 +105,35 @@ const CHECKER_DICTIONARY = {
     '특허': { replace: '[기재 금지]', reason: '특허 출원 및 발명 실적 관련은 기재 금지 사항입니다.' },
     '자격증': { replace: '[기재 금지]', reason: '기술/사설 자격증 취득 사실은 기재 금지 사항입니다.' },
     '컴퓨터활용능력': { replace: '[기재 금지]', reason: '국가기술자격증 등의 생기부 본문 기재는 금지되어 있습니다.' },
-    '워드프로세서': { replace: '[기재 금지]', reason: '국가기술자격증 등의 생기부 본문 기재는 금지되어 있습니다.' }
+    '워드프로세서': { replace: '[기재 금지]', reason: '국가기술자격증 등의 생기부 본문 기재는 금지되어 있습니다.' },
+    
+    // [추가] 기재 불가 상호명
+    '구글': { replace: '포털 사이트 / IT 기업', reason: '특정 기업명 및 상호명(구글)은 생기부 기재 금지 조항에 해당합니다.' },
+    '네이버': { replace: '포털 사이트 / 정보 검색 서비스', reason: '특정 기업명 및 상호명(네이버)은 생기부 기재 금지 조항에 해당합니다.' },
+    '유튜브': { replace: '동영상 플랫폼 / 공유 채널', reason: '특정 기업명 및 상호명(유튜브)은 생기부 기재 금지 조항에 해당합니다.' },
+    '카카오톡': { replace: '모바일 메신저', reason: '특정 서비스명 및 상호명(카카오톡)은 생기부 기재 금지 조항에 해당합니다.' },
+    '카카오': { replace: 'IT 기업', reason: '특정 기업명 및 상호명(카카오)은 생기부 기재 금지 조항에 해당합니다.' },
+    '삼성': { replace: 'IT 기업 / 대기업', reason: '특정 기업명 및 상호명(삼성)은 생기부 기재 금지 조항에 해당합니다.' },
+    '애플': { replace: 'IT 기업 / 제조사', reason: '특정 기업명 및 상호명(애플)은 생기부 기재 금지 조항에 해당합니다.' },
+    '오픈AI': { replace: '인공지능 연구소 / AI 기업', reason: '특정 기업명 및 상호명(오픈AI)은 생기부 기재 금지 조항에 해당합니다.' },
+    'OpenAI': { replace: '인공지능 연구소 / AI 기업', reason: '특정 기업명 및 상호명(OpenAI)은 생기부 기재 금지 조항에 해당합니다.' },
+    'ChatGPT': { replace: '생성형 인공지능 / 언어 모델', reason: '특정 서비스명 및 상호명(ChatGPT)은 생기부 기재 금지 조항에 해당합니다.' },
+    '제미나이': { replace: '생성형 인공지능 / 언어 모델', reason: '특정 서비스명 및 상호명(제미나이)은 생기부 기재 금지 조항에 해당합니다.' },
+    'Gemini': { replace: '생성형 인공지능 / 언어 모델', reason: '특정 서비스명 및 상호명(Gemini)은 생기부 기재 금지 조항에 해당합니다.' },
+
+    // [추가] 기재 불가 기관명
+    '유네스코': { replace: '국제기구', reason: '기재 금지 대상 기관(유네스코) 명칭입니다. 일반 명사(국제기구)로 순화하여 작성하십시오.' },
+    'UNESCO': { replace: '국제기구', reason: '기재 금지 대상 기관(UNESCO) 명칭입니다. 일반 명사(국제기구)로 순화하여 작성하십시오.' },
+    'WTO': { replace: '국제 무역 기구', reason: '기재 금지 대상 기관(WTO) 명칭입니다. 일반 명사로 순화하여 작성하십시오.' },
+    'OECD': { replace: '국제 협력 기구', reason: '기재 금지 대상 기관(OECD) 명칭입니다. 일반 명사로 순화하여 작성하십시오.' },
+    '유엔': { replace: '국제 연합 기구', reason: '기재 금지 대상 기관(유엔) 명칭입니다. 일반 명사로 순화하여 작성하십시오.' },
+    'UN': { replace: '국제 연합 기구', reason: '기재 금지 대상 기관(UN) 명칭입니다. 일반 명사로 순화하여 작성하십시오.' },
+    '통계청': { replace: '국가 통계 기관', reason: '기재 금지 대상 기관(통계청) 명칭입니다. 일반 명사로 순화하여 작성하십시오.' },
+    '금융감독원': { replace: '금융 관리 기관', reason: '기재 금지 대상 기관(금융감독원) 명칭입니다. 일반 명사로 순화하여 작성하십시오.' },
+    '금감원': { replace: '금융 관리 기관', reason: '기재 금지 대상 기관(금감원) 명칭입니다. 일반 명사로 순화하여 작성하십시오.' },
+
+    // [추가] 체육대회 단어 기재 불가 및 대체 제안
+    '체육대회': { replace: '스포츠 페스티벌 / 체육 한마당', reason: '생활기록부 기재 가이드라인상 "체육대회" 단어는 직접적인 기재가 금지되어 있습니다. 대체 표현(스포츠 페스티벌, 체육 한마당 등)으로 순화하십시오.' }
   }
 };
 
@@ -280,6 +308,64 @@ function inspectStudentRecord(text, studentName = '', customConfig = {}) {
       }
       offset += line.length + 1; // \n 길이 포함
     });
+  }
+
+  // 6. [추가 로컬 규칙] 대학명 기재 금지 정규식 감지
+  if (config.forbidden) {
+    const univRegex = /([가-힣]{2,10}(대학교|대학원|전문대|전문대학))|([서연고]대|서울대|연세대|고려대|서강대|성균관대|한양대|이화여대|중앙대|경희대|한국외대|서울시립대|카이스트|포스텍|디지스트|유니스트|지스트)/g;
+    let match;
+    while ((match = univRegex.exec(text)) !== null) {
+      errors.push({
+        type: 'forbidden',
+        label: '대학명 기재 금지',
+        start: match.index,
+        end: match.index + match[0].length,
+        original: match[0],
+        replace: '[기재 금지]',
+        reason: `특정 대학명칭 및 약칭(${match[0]})은 학교생활기록부 기재 금지 조항에 해당합니다.`
+      });
+    }
+  }
+
+  // 7. [추가 로컬 규칙] 강사명/교수 실명 기재 금지 정규식 감지 (예: 김철수 교수, 홍길동 강사)
+  if (config.forbidden) {
+    // 2~4글자 이름 뒤에 강사, 교수, 박사, 연구원 등이 붙는 유형
+    const lecturerRegex = /([가-힣]{2,4})\s*(강사|교수|박사|연구원)/g;
+    let match;
+    while ((match = lecturerRegex.exec(text)) !== null) {
+      errors.push({
+        type: 'forbidden',
+        label: '강사명 기재 금지',
+        start: match.index,
+        end: match.index + match[0].length,
+        original: match[0],
+        replace: '전문가 / 관련 분야 종사자',
+        reason: `외부 특강 강사 및 교수 등의 실명 기재(${match[0]})는 생활기록부 기재 금지 조항에 해당합니다.`
+      });
+    }
+  }
+
+  // 8. [추가 로컬 규칙] 영어 알파벳 단어 단독 기재 주의
+  if (config.forbidden) {
+    // 영어 알파벳 2글자 이상 (전부 대문자 혹은 소문자로 된 영어 단어)
+    const englishRegex = /[a-zA-Z]{2,}/g;
+    let match;
+    while ((match = englishRegex.exec(text)) !== null) {
+      const word = match[0];
+      // 이미 공인어학시험 등으로 forbidden 사전에 잡혀 있는 것들은 중복 회피
+      const isKnownForbidden = ['TOEIC', 'TOEFL', 'TEPS', 'HSK', 'JLPT', 'UNESCO', 'WTO', 'OECD', 'UN', 'OpenAI', 'Gemini', 'ChatGPT'].includes(word);
+      if (!isKnownForbidden) {
+        errors.push({
+          type: 'forbidden',
+          label: '외국어 단독 표기 주의',
+          start: match.index,
+          end: match.index + word.length,
+          original: word,
+          replace: '한글 음차 표기 권장',
+          reason: `생활기록부는 한글 기재가 원칙입니다. 외국어 표기(${word}) 대신 한글 표기 또는 한글 음차 표기(예: Python -> 파이썬)를 권장합니다.`
+        });
+      }
+    }
   }
 
   // 시작 인덱스 오름차순 정렬

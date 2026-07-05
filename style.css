@@ -1,4 +1,4 @@
-@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/NanumSquareRound.css');
+@import url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/NanumSquareRound.css');
 
 /* Notion-like Styling for Student Record Checker */
 
@@ -19,12 +19,15 @@
   /* Error Accent Colors (Notion Callout style) */
   --color-spelling-bg: #ffe2dd;
   --color-spelling-text: #d44027;
+  --color-spelling-border: #f9c0b7;
   
   --color-slang-bg: #fdecc8;
   --color-slang-text: #b35900;
+  --color-slang-border: #f5d393;
   
   --color-loanword-bg: #e8edf2;
   --color-loanword-text: #0c66e4;
+  --color-loanword-border: #b8c9e0;
   
   --color-forbidden-bg: #ffe2dd;
   --color-forbidden-text: #d44027;
@@ -90,6 +93,11 @@ aside.sidebar.collapsed {
   align-items: center;
   gap: 8px;
   transition: padding 0.25s ease;
+  -webkit-app-region: drag;
+}
+
+.sidebar-header * {
+  -webkit-app-region: no-drag;
 }
 
 aside.sidebar.collapsed .sidebar-header {
@@ -202,7 +210,13 @@ main.content-area {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
+  padding-right: 140px; /* 우측 캡션 버튼 공간 확보 */
   flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.page-header * {
+  -webkit-app-region: no-drag;
 }
 
 .page-title {
@@ -234,6 +248,7 @@ main.content-area {
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
   user-select: none;
+  white-space: nowrap; /* 글자가 강제로 줄바꿈되지 않도록 방지 */
 }
 
 .btn:hover {
@@ -781,7 +796,7 @@ main.content-area {
 
 /* Error card color mapping (좌측의 2px 칼라바로 슬림화) */
 .error-card.card-spelling {
-  border-left: 2px solid var(--color-spelling-text);
+  border-left: 2px solid var(--color-spelling-border);
 }
 .error-card.card-spelling ins {
   background-color: var(--color-spelling-bg);
@@ -792,7 +807,7 @@ main.content-area {
 }
 
 .error-card.card-slang {
-  border-left: 2px solid var(--color-slang-text);
+  border-left: 2px solid var(--color-slang-border);
 }
 .error-card.card-slang ins {
   background-color: var(--color-slang-bg);
@@ -803,7 +818,7 @@ main.content-area {
 }
 
 .error-card.card-loanword {
-  border-left: 2px solid var(--color-loanword-text);
+  border-left: 2px solid var(--color-loanword-border);
 }
 .error-card.card-loanword ins {
   background-color: var(--color-loanword-bg);
@@ -814,7 +829,7 @@ main.content-area {
 }
 
 .error-card.card-forbidden {
-  border-left: 2px solid var(--color-forbidden-text);
+  border-left: 2px solid var(--color-forbidden-border);
 }
 .error-card.card-forbidden ins {
   background-color: var(--color-forbidden-bg);
@@ -867,6 +882,20 @@ main.content-area {
   opacity: 0;
   pointer-events: none;
   border-right: 1px solid transparent;
+  overflow: hidden;
+}
+
+/* 오류 및 건의사항 결과 패널 접기 효과 */
+.results-panel {
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, border-color 0.25s ease;
+  opacity: 1;
+}
+
+.results-panel.collapsed {
+  width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  border-left: 1px solid transparent !important;
   overflow: hidden;
 }
 
@@ -1208,23 +1237,41 @@ input:checked + .slider:before {
   gap: 10px;
   padding: 6px 10px;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 0;
   background-color: var(--bg-primary);
-  margin-bottom: 4px;
+  margin-bottom: 0;
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
 }
 
+.editor-student-item + .editor-student-item {
+  margin-top: -1px;
+}
+
+.editor-student-item:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.editor-student-item:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
 .editor-student-item:hover {
   border-color: var(--border-focus);
   background-color: var(--bg-hover);
+  position: relative;
+  z-index: 1;
 }
 
 .editor-student-item.active {
   border-color: var(--border-focus);
   background-color: var(--bg-selected);
   box-shadow: inset 3px 0 0 var(--border-focus);
+  position: relative;
+  z-index: 2;
 }
 
 .editor-student-item-idx {
@@ -1287,4 +1334,118 @@ input:checked + .slider:before {
   background-color: var(--bg-primary);
 }
 
+/* 과목별 확인 탭의 좌측 과목 리스트 아이템 스타일 */
+.subject-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  background-color: var(--bg-primary);
+  margin-bottom: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
 
+.subject-list-item + .subject-list-item {
+  margin-top: -1px;
+}
+
+.subject-list-item:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.subject-list-item:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.subject-list-item:hover {
+  border-color: var(--border-focus);
+  background-color: var(--bg-hover);
+  position: relative;
+  z-index: 1;
+}
+
+.subject-list-item.active {
+  border-color: var(--border-focus);
+  background-color: var(--bg-selected);
+  box-shadow: inset 3px 0 0 var(--border-focus);
+  position: relative;
+  z-index: 2;
+}
+
+.subject-list-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.subject-list-item-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.subject-list-item-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.subject-list-item-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 과목별 확인 탭 우측 학생 카드가 1줄에 1개씩 배치되도록 설정 */
+#subject-student-cards-container .group-card-grid {
+  grid-template-columns: 1fr;
+  gap: 0; /* 카드 사이 간격 제거 */
+}
+
+#subject-student-cards-container .group-student-card {
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+#subject-student-cards-container .group-student-card + .group-student-card {
+  margin-top: -1px; /* 테두리 중복 방지 */
+}
+
+#subject-student-cards-container .group-student-card:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+#subject-student-cards-container .group-student-card:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+#subject-student-cards-container .group-card-desc {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+#subject-student-cards-container .group-student-card {
+  min-width: 0;
+}
+#subject-student-cards-container .group-card-title,
+#subject-student-cards-container .group-card-subtitle {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: keep-all;
+}
