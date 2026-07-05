@@ -1,0 +1,11 @@
+async function getBestAvailableModel\
+2:         idx = line.find("async function getBestAvailableModel")\
+3:         if idx != -1:\
+4:             # Grab a chunk of text after it\
+5:             chunk = line[idx:idx+2500]\
+6:             # Try to find the end of the function (roughly)\
+7:             # It ends before the next function fetchGeminiAiAnalysis\
+8:             end_marker = "'
+9: 
+10: 
+The above content shows the entire, complete file contents of the requested file.

@@ -1,0 +1,15 @@
+  btnAddDictRow: document.getElementById('btn-add-dict-row'),
+
+  // Tab 4: 과목별 확인 (2단 분할 레이아웃 개편)
+  sidebarSubjectList: document.getElementById('sidebar-subject-list'),
+  subjectListCount: document.getElementById('subject-list-count'),
+  subjectSearchInputTab: document.getElementById('subject-search-input-tab'),
+  subjectFilterYear: document.getElementById('subject-filter-year'),
+  subjectFilterTerm: document.getElementById('subject-filter-term'),
+  subjectFilterGrade: document.getElementById('subject-filter-grade'),
+  subjectListContainer: document.getElementById('subject-list-container'),
+  subjectEmptyState: document.getElementById('subject-empty-state'),
+  subjectActiveContainer: document.getElementById('subject-active-container'),
+  currentSubjectTitle: document.getElementById('current-subject-title'),
+  currentSubjectMeta: document.getElementById('current-subject-meta'),
+  subjectStudentCardsContainer: document.getElementById('subject-student-cards-container'),

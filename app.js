@@ -98,7 +98,24 @@ const DOM = {
   btnAddDictRow: document.getElementById('btn-add-dict-row'),
   
   // Toast 알림
-  toastContainer: document.getElementById('toast-container')
+  toastContainer: document.getElementById('toast-container'),
+
+  // Gemini API 설정
+  settingAiEnabled: document.getElementById('setting-aiEnabled'),
+  settingAiKey: document.getElementById('setting-ai-key'),
+  btnSaveAiKey: document.getElementById('btn-save-ai-key'),
+
+  // Tab 4: 과목별 확인 (2단 분할 레이아웃 개편)
+  subjectFilterYear: document.getElementById('subject-filter-year'),
+  subjectFilterTerm: document.getElementById('subject-filter-term'),
+  subjectFilterGrade: document.getElementById('subject-filter-grade'),
+  subjectListContainer: document.getElementById('subject-list-container'),
+  subjectEmptyState: document.getElementById('subject-empty-state'),
+  subjectActiveContainer: document.getElementById('subject-active-container'),
+  currentSubjectTitle: document.getElementById('current-subject-title'),
+  currentSubjectMeta: document.getElementById('current-subject-meta'),
+  subjectStudentCardsContainer: document.getElementById('subject-student-cards-container'),
+  subjectSearchInputTab: document.getElementById('subject-search-input-tab')
 };
 
 // 3. 초기화 로직
@@ -201,15 +218,46 @@ function initEventListeners() {
     }, 250); // 250ms 디바운싱
   });
 
+  // AI 설정 이벤트 리스너
+  if (DOM.settingAiEnabled) {
+    DOM.settingAiEnabled.addEventListener('change', (e) => {
+      state.settings.aiEnabled = e.target.checked;
+      saveSettingsToStorage();
+      if (e.target.checked) runAnalysisOnAllStudents();
+    });
+  }
+
+  if (DOM.btnSaveAiKey && DOM.settingAiKey) {
+    DOM.btnSaveAiKey.addEventListener('click', () => {
+      const key = DOM.settingAiKey.value.trim();
+      state.settings.aiKey = key;
+      saveSettingsToStorage();
+      showToast('Gemini API Key가 저장되었습니다.');
+    });
+  }
+
+  // 과목별 확인 필터 이벤트 리스너
+  if (DOM.subjectFilterYear) DOM.subjectFilterYear.addEventListener('change', renderSubjectGroupView);
+  if (DOM.subjectFilterTerm) DOM.subjectFilterTerm.addEventListener('change', renderSubjectGroupView);
+  if (DOM.subjectFilterGrade) DOM.subjectFilterGrade.addEventListener('change', renderSubjectGroupView);
+  if (DOM.subjectSearchInputTab) {
+    let subjectSearchTimeout;
+    DOM.subjectSearchInputTab.addEventListener('input', (e) => {
+      clearTimeout(subjectSearchTimeout);
+      subjectSearchTimeout = setTimeout(() => {
+        renderSubjectGroupView();
+      }, 250);
+    });
+  }
+
   DOM.btnAddRow.addEventListener('click', addNewStudentRow);
-  DOM.btnInspectAllNav.addEventListener('click', () => {
+  DOM.btnInspectAllNav.addEventListener('click', async () => {
     if (state.students.length === 0) {
-      showToast('점검할 학생 데이터를 먼저 추가해 주세요.');
+      showToast('분석할 학생 데이터를 먼저 추가해 주세요.');
       return;
     }
-    runAnalysisOnAllStudents();
-    showToast('모든 학생 데이터 분석이 완료되었습니다!');
-    // 분석 후 바로 에디터 탭으로 이동
+    await runAnalysisOnAllStudents(true);
+    // 분석 후 바로 에디터로 탭 이동
     if (state.students.length > 0) {
       state.currentStudentIndex = 0;
       loadStudentIntoEditor(0);
@@ -770,52 +818,62 @@ function handleExcelUpload(e) {
 }
 
 // 8. 학생 분석 로직 연동
-function runAnalysisOnStudent(index) {
+function runAnalysisOnStudent(index, forceAi = false) {
   if (index < 0 || index >= state.students.length) return;
   const stud = state.students[index];
   
-  // 커스텀 설정을 담아 분석 엔진 호출
   const customConfig = {
     ...state.settings,
     customDictionary: state.customDictionary
   };
   
-  stud.errors = window.inspectStudentRecord(stud.content, stud.name, customConfig);
+  const rawErrors = window.inspectStudentRecord(stud.content, stud.name, customConfig);
+  
+  stud.ignoredWords = stud.ignoredWords || [];
+  stud.errors = rawErrors.filter(err => !stud.ignoredWords.includes(err.original));
   stud.checked = true;
 
-  // 좌측 학생 명부 중 해당 학생의 완료/경고 배지만 부분 업데이트하여 성능 저하 및 포커스 튐 차단
-  if (DOM.editorStudentListContainer) {
-    const studKey = `${stud.sNum || '학번없음'}_${stud.name}`;
-    const item = DOM.editorStudentListContainer.querySelector(`.editor-student-item[data-student-key="${studKey}"]`);
-    if (item) {
-      const statusDiv = item.querySelector('.editor-student-item-status');
-      if (statusDiv) {
-        // 이 학생의 모든 수강 과목 레코드를 다 모아 통합 에러 연산 수행
-        const studentAllRecords = state.students.filter(s => s.name === stud.name && s.sNum === stud.sNum);
-        const totalErrCount = studentAllRecords.reduce((sum, r) => sum + (r.errors ? r.errors.length : 0), 0);
-        
-        statusDiv.innerHTML = totalErrCount > 0 
-          ? '<i data-lucide="alert-circle" class="status-icon-warn" style="width:16px; height:16px;"></i>'
-          : '<i data-lucide="check-circle" class="status-icon-ok" style="width:16px; height:16px;"></i>';
-        lucide.createIcons();
-      }
-    }
+  updateStudentListStatusIcon(index);
+
+  if (forceAi && state.settings.aiEnabled && state.settings.aiKey && stud.content) {
+    return triggerAiAnalysis(index);
   }
+  return Promise.resolve();
 }
 
-function runAnalysisOnAllStudents() {
-  state.students.forEach((_, idx) => {
-    runAnalysisOnStudent(idx);
-  });
+async function runAnalysisOnAllStudents(forceAi = false) {
+  const isAiActive = forceAi && state.settings.aiEnabled && state.settings.aiKey;
+  
+  if (isAiActive) {
+    showLoadingOverlay("AI 분석 준비 중...");
+    const total = state.students.length;
+    let success = 0;
+    let fail = 0;
+    
+    for (let idx = 0; idx < total; idx++) {
+      showLoadingOverlay(`AI 점검 진행 중... (${idx + 1}/${total})`);
+      try {
+        await runAnalysisOnStudent(idx, true);
+        success++;
+      } catch (e) {
+        console.error(`Student ${idx} AI Analysis failed:`, e);
+        fail++;
+      }
+    }
+    hideLoadingOverlay();
+    showToast(`AI 분석 완료 (성공: ${success}명, 실패: ${fail}명)`);
+  } else {
+    state.students.forEach((_, idx) => {
+      runAnalysisOnStudent(idx, false);
+    });
+  }
+  
   saveStudentsToStorage();
   updateDashboardStats();
-  
-  // 일괄 분석 완료 시 에디터용 명부 리스트 및 필터 드롭다운도 동시 갱신
   updateEditorFilterDropdowns();
   renderEditorStudentList();
 }
 
-// 9. 대시보드 통계 업데이트
 function updateDashboardStats() {
   // 학번과 이름을 조합하여 중복되지 않는 실제 고유 학생 수 산출
   const uniqueStudents = new Set();
@@ -1292,6 +1350,18 @@ function renderInspectionResults() {
 
   if (state.currentStudentIndex === -1) return;
   const stud = state.students[state.currentStudentIndex];
+  
+  const feedbackBlock = document.getElementById('ai-general-feedback');
+  const feedbackText = document.getElementById('ai-general-feedback-text');
+  if (feedbackBlock && feedbackText) {
+    if (stud.aiFeedback) {
+      feedbackBlock.style.display = 'block';
+      feedbackText.innerText = stud.aiFeedback;
+    } else {
+      feedbackBlock.style.display = 'none';
+      feedbackText.innerText = '';
+    }
+  }
 
   if (!stud.errors || stud.errors.length === 0) {
     list.innerHTML = `
@@ -1608,6 +1678,301 @@ function initSettingsUI() {
   DOM.settingNameCheck.checked = state.settings.nameCheck;
 }
 
+
+// ----------------------------------------------------
+// AI 점검 관련 전역 제어 변수
+const aiControl = {
+  abortController: null,
+  debounceTimer: null
+};
+
+// 1) 캐시용 변수
+let cachedAiModel = null;
+
+// 2) 가용한 최적의 모델 반환
+async function getBestAvailableModel(apiKey) {
+  if (cachedAiModel) return cachedAiModel;
+  
+  try {
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    const res = await fetch(listUrl);
+    if (!res.ok) {
+      console.warn("[AI 진단] 모델 리스트 획득 실패, 기본값(gemini-1.5-flash) 사용:", await res.text());
+      return 'gemini-1.5-flash';
+    }
+    const data = await res.json();
+    const models = data.models || [];
+    
+    const supported = models.filter(m => 
+      m.supportedGenerationMethods && 
+      m.supportedGenerationMethods.includes('generateContent')
+    ).map(m => m.name.replace('models/', ''));
+    
+    console.log("[AI 진단] 가용한 모델 목록:", supported);
+    
+    const preferences = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-1.5-pro-latest', 'gemini-1.0-pro', 'gemini-pro'];
+    
+    for (const pref of preferences) {
+      if (supported.includes(pref)) {
+        cachedAiModel = pref;
+        console.log("[AI 진단] 선호 모델 선택 완료:", cachedAiModel);
+        return cachedAiModel;
+      }
+    }
+    
+    if (supported.length > 0) {
+      cachedAiModel = supported[0];
+      console.log("[AI 진단] 선호 목록 외 대체 모델 선택 완료:", cachedAiModel);
+      return cachedAiModel;
+    }
+    
+    return 'gemini-1.5-flash';
+  } catch(e) {
+    console.error("[AI 진단] 모델 탐색 중 에러 발생, 기본값 사용:", e);
+    return 'gemini-1.5-flash';
+  }
+}
+
+// 3) Gemini API 요청 수행
+async function fetchGeminiAiAnalysis(maskedText, studentName) {
+  const apiKey = state.settings.aiKey;
+  if (!apiKey) {
+    console.warn("[AI 점검] API Key가 설정되어 있지 않습니다.");
+    return { errors: [], feedback: "" };
+  }
+
+  const bestModel = await getBestAvailableModel(apiKey);
+  console.log(`[AI 진단] 최종 선택된 AI 모델: ${bestModel}`);
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${bestModel}:generateContent?key=${apiKey}`;
+  
+  const prompt = `
+  당신은 대한민국 교육부의 생활기록부 기재 요령 지침을 준수하는 고정밀 맞춤법 및 기재 요령 위반 점검관입니다.
+  다음 학생 생특 본문에서 아래 4가지 지침을 기준으로 오류를 찾아 분석해주세요:
+  1. 단순 맞춤법, 띄어쓰기, 어색한 한국어 표현 교정
+  2. 비표준어, 비속어, 격식 없는 구어체 감지
+  3. 교육부 생기부 기재 금지 조항 위반 (교외 수상 실적, 공인어학시험, 구체적인 특정 대학명 우회 언급 예: '신촌의 명문대', 부모 직업 간접 언급 예: '의사이신 아버지를 따라')
+  4. 본문 내 문장 종결 어미 혼용 (현재형 '~한다'와 명사형 '~음/함'이 혼용된 것이 있는지 검색)
+
+  [생특 본문]
+  "${maskedText}"
+
+  출력은 반드시 다른 설명(마크다운 코드블록 등) 없이 오직 아래 지정된 JSON 스키마를 만족하는 JSON 포맷으로 반환해야 합니다:
+  {
+    "feedback": "본문이 전반적으로 잘 작성되었는지, 아쉬운 점은 없는지 2~3문장으로 총평을 작성하세요. 잘했으면 칭찬하고, 못했으면 보완점을 알려주세요.",
+    "errors": [
+      {
+        "original": "오류문구(원문에서 있는 그대로의 부분문자열)",
+        "replace": "교정제안단어",
+        "reason": "오류 판정 이유 및 가이드라인",
+        "type": "spelling" 또는 "forbidden" 또는 "endingStyle" 중 하나
+      }
+    ]
+  }
+  `;
+
+  const requestBody = {
+    contents: [
+      {
+        parts: [
+          {
+            text: prompt
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      responseMimeType: "application/json"
+    }
+  };
+
+  console.log(`[AI 진단] Gemini API 요청 전송 시작 (URL: ${url.split('?')[0]}?key=***)`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    console.log(`[AI 진단] Gemini API 응답 받음 (상태 코드: ${response.status})`);
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = errData.error ? errData.error.message : 'HTTP 오류';
+      const errStatus = errData.error ? errData.error.status : 'UNKNOWN';
+      
+      if (errStatus === 'NOT_FOUND') {
+        cachedAiModel = null;
+      }
+      
+      console.error("[Gemini API 에러 응답 상세]", errData.error);
+      throw new Error(`${errStatus}: ${errMsg}`);
+    }
+
+    const data = await response.json();
+    if (!data.candidates || data.candidates.length === 0) {
+      console.warn("[AI 진단] API 응답에 candidates가 없습니다.");
+      return { errors: [], feedback: "" };
+    }
+
+    const jsonText = data.candidates[0].content.parts[0].text;
+    console.log("[AI 진단] 수신된 raw JSON 텍스트:", jsonText);
+
+    let parsedData;
+    try {
+      parsedData = JSON.parse(jsonText);
+    } catch (e) {
+      const match = jsonText.match(/```(?:json)?\n([\s\S]*?)\n```/);
+      if (match) {
+        parsedData = JSON.parse(match[1]);
+      } else {
+        throw new Error("Invalid JSON format from Gemini");
+      }
+    }
+
+    let aiErrors = [];
+    let aiFeedback = "";
+    if (Array.isArray(parsedData)) {
+      aiErrors = parsedData;
+    } else if (parsedData && typeof parsedData === 'object') {
+      aiErrors = parsedData.errors || [];
+      aiFeedback = parsedData.feedback || "";
+    }
+
+    console.log(`[AI 진단] 파싱 성공 (감지된 오류 수: ${aiErrors.length}, 피드백 길이: ${aiFeedback.length})`);
+    return { errors: Array.isArray(aiErrors) ? aiErrors : [], feedback: aiFeedback };
+  } catch (error) {
+    console.error("[AI 진단] Gemini API 요청 중 예외 발생:", error);
+    showToast(`AI 분석 실패: ${error.message || '네트워크 오류가 발생했습니다.'}`);
+    return { errors: [], feedback: "" };
+  }
+}
+
+// 4) triggerAiAnalysis 함수 정의
+async function triggerAiAnalysis(index) {
+  if (index < 0 || index >= state.students.length) return;
+  const stud = state.students[index];
+  const origText = stud.content;
+  if (!origText) return;
+
+  console.log(`[AI 진단] 학생 ${index + 1} (${stud.name}) AI 분석 시작`);
+
+  // 1. 개인정보 비식별화 마스크
+  const maskedText = maskStudentName(origText, stud.name);
+
+  // 2. Gemini API 비동기 병렬 요청
+  const aiResult = await fetchGeminiAiAnalysis(maskedText, stud.name);
+  const rawAiErrors = aiResult.errors || [];
+  
+  if (aiResult.feedback) {
+    stud.aiFeedback = aiResult.feedback;
+    console.log(`[AI 진단] 학생 ${index + 1} 피드백 저장 완료: ${aiResult.feedback}`);
+  }
+
+  // 3. AI 오류 결과를 로컬 인덱스 범위 포맷으로 복원
+  const mappedAiErrors = mapAiErrorsToLocalFormat(rawAiErrors, origText, maskedText, stud.name);
+
+  // 4. 기존 로컬 오류 목록과 병합 (중복 방지)
+  mappedAiErrors.forEach(aiErr => {
+    const isDuplicate = stud.errors.some(localErr => localErr.start === aiErr.start && localErr.end === aiErr.end);
+    if (!isDuplicate) {
+      stud.errors.push(aiErr);
+    }
+  });
+
+  // 5. X 버튼 무시 단어 목록 필터링 적용
+  stud.ignoredWords = stud.ignoredWords || [];
+  stud.errors = stud.errors.filter(err => !stud.ignoredWords.includes(err.original));
+
+  // 6. 상태 아이콘 및 화면 업데이트 (백그라운드에서 완료되었으므로 화면 동기화)
+  updateStudentListStatusIcon(index);
+  if (index === state.currentStudentIndex) {
+    console.log(`[AI 진단] 현재 편집중인 학생의 화면을 갱신합니다.`);
+    renderInspectionResults();
+  }
+}
+
+// 5) AI 분석용 로딩 오버레이 함수
+function showLoadingOverlay(message) {
+  let overlay = document.getElementById('ai-loading-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'ai-loading-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+    overlay.style.zIndex = '9999';
+    overlay.style.color = 'white';
+    overlay.style.fontFamily = 'inherit';
+    
+    const spinner = document.createElement('div');
+    spinner.style.width = '50px';
+    spinner.style.height = '50px';
+    spinner.style.border = '5px solid rgba(255,255,255,0.3)';
+    spinner.style.borderTop = '5px solid #0066cc';
+    spinner.style.borderRadius = '50%';
+    spinner.style.animation = 'spin 1s linear infinite';
+    overlay.appendChild(spinner);
+    
+    const style = document.createElement('style');
+    style.innerHTML = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+    
+    const text = document.createElement('div');
+    text.id = 'ai-loading-text';
+    text.style.marginTop = '20px';
+    text.style.fontSize = '16px';
+    text.style.fontWeight = 'bold';
+    text.innerText = message;
+    overlay.appendChild(text);
+    
+    document.body.appendChild(overlay);
+  } else {
+    document.getElementById('ai-loading-text').innerText = message;
+  }
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('ai-loading-overlay');
+  if (overlay) {
+    overlay.remove();
+  }
+}
+
+// 6) 좌측 학생 목록 상태 아이콘 갱신 헬퍼
+function updateStudentListStatusIcon(index) {
+  if (index < 0 || index >= state.students.length) return;
+  const stud = state.students[index];
+  if (!DOM.editorStudentListContainer) return;
+
+  const studKey = `${stud.sNum || '학번없음'}_${stud.name}`;
+  const item = DOM.editorStudentListContainer.querySelector(`.editor-student-item[data-student-key="${studKey}"]`);
+  if (item) {
+    const statusDiv = item.querySelector('.editor-student-item-status');
+    if (statusDiv) {
+      const studentAllRecords = state.students.filter(s => s.name === stud.name && s.sNum === stud.sNum);
+      const totalErrCount = studentAllRecords.reduce((sum, r) => sum + (r.errors ? r.errors.length : 0), 0);
+      
+      statusDiv.innerHTML = totalErrCount > 0 
+        ? '<i data-lucide="alert-circle" class="status-icon-warn" style="width:16px; height:16px;"></i>'
+        : '<i data-lucide="check-circle" class="status-icon-ok" style="width:16px; height:16px;"></i>';
+      lucide.createIcons();
+    }
+  }
+}
+
+// ----------------------------------------------------
+
 function escapeHTML(str) {
   if (!str) return '';
   return str
@@ -1923,105 +2288,247 @@ function renderStudentGroupView() {
   lucide.createIcons();
 }
 
+// 12. 과목별 확인 탭 렌더링 (2단 분할 레이아웃 사양)
 function renderSubjectGroupView() {
-  const container = document.getElementById('subject-hierarchy-tree');
-  container.innerHTML = '';
-  
+  if (!DOM.subjectListContainer) return;
+  DOM.subjectListContainer.innerHTML = '';
+
   if (state.students.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <i data-lucide="book-open"></i>
-        <h4>표시할 과목 데이터가 없습니다</h4>
-        <p>'데이터 관리' 탭에서 데이터를 업로드해 주세요.</p>
+    if (DOM.subjectListCount) DOM.subjectListCount.textContent = '0';
+    if (DOM.subjectEmptyState) DOM.subjectEmptyState.style.display = 'flex';
+    if (DOM.subjectActiveContainer) DOM.subjectActiveContainer.style.display = 'none';
+    DOM.subjectListContainer.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+        분석된 학생 데이터가 없습니다.
       </div>
     `;
-    lucide.createIcons();
     return;
   }
 
-  // 1. 과목별 그룹화
-  const tree = {};
+  // 1. 드롭다운 필터 요소들의 고유 데이터 추출 및 동적 구성
+  const yearsSet = new Set();
+  const termsSet = new Set();
+  const gradesSet = new Set();
+
   state.students.forEach(s => {
-    const sub = s.subject || '과목 없음';
-    if (!tree[sub]) tree[sub] = [];
-    tree[sub].push(s);
+    if (s.year) yearsSet.add(s.year);
+    if (s.term) termsSet.add(s.term);
+    const { grade } = parseGradeClassNumberFromSNum(s.sNum);
+    if (grade) gradesSet.add(grade + '학년');
   });
 
-  // 2. DOM 빌드
-  const sortedSubjects = Object.keys(tree).sort();
-  
-  sortedSubjects.forEach(sub => {
-    const records = tree[sub];
-    
-    // 과목의 총 오류 개수
-    let totalErrors = 0;
-    records.forEach(r => { if (r.errors) totalErrors += r.errors.length; });
-    const badgeMsg = totalErrors > 0 ? `오류 ${totalErrors}건` : '정상';
+  // select 갱신
+  rebuildSelect(DOM.subjectFilterYear, yearsSet, '학년도');
+  rebuildSelect(DOM.subjectFilterTerm, termsSet, '학기');
+  rebuildSelect(DOM.subjectFilterGrade, gradesSet, '학년');
 
-    const subAcc = createAccordion(sub, `${records.length}명 / ${badgeMsg}`);
-    container.appendChild(subAcc.element);
+  // 현재 필터 값 획득
+  const filterYear = DOM.subjectFilterYear ? DOM.subjectFilterYear.value : 'all';
+  const filterTerm = DOM.subjectFilterTerm ? DOM.subjectFilterTerm.value : 'all';
+  const filterGrade = DOM.subjectFilterGrade ? DOM.subjectFilterGrade.value : 'all';
+  const searchQuery = DOM.subjectSearchInputTab ? DOM.subjectSearchInputTab.value.trim().toLowerCase() : '';
+
+  // 2. 학생 데이터 필터링 및 과목별 그룹화
+  const groups = {}; // key: "year|term|grade|subject" -> students array
+  
+  state.students.forEach(s => {
+    const { grade } = parseGradeClassNumberFromSNum(s.sNum);
+    const gradeStr = grade ? grade + '학년' : '학년없음';
+    const sub = s.subject || '과목없음';
+
+    // 필터 조건 체크
+    if (filterYear !== 'all' && s.year !== filterYear) return;
+    if (filterTerm !== 'all' && s.term !== filterTerm) return;
+    if (filterGrade !== 'all' && gradeStr !== filterGrade) return;
+    if (searchQuery && !sub.toLowerCase().includes(searchQuery)) return;
+
+    const groupKey = `${s.year}|${s.term}|${gradeStr}|${sub}`;
+    if (!groups[groupKey]) {
+      groups[groupKey] = [];
+    }
+    groups[groupKey].push(s);
+  });
+
+  const groupKeys = Object.keys(groups).sort();
+  if (DOM.subjectListCount) DOM.subjectListCount.textContent = groupKeys.length;
+
+  if (groupKeys.length === 0) {
+    if (DOM.subjectEmptyState) DOM.subjectEmptyState.style.display = 'flex';
+    if (DOM.subjectActiveContainer) DOM.subjectActiveContainer.style.display = 'none';
+    DOM.subjectListContainer.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+        조건에 맞는 과목이 없습니다.
+      </div>
+    `;
+    return;
+  }
+
+  // 3. 왼쪽 사이드바 리스트 렌더링
+  groupKeys.forEach(key => {
+    const [year, term, gradeStr, subject] = key.split('|');
+    const studentsInGroup = groups[key];
     
-    // 과목 배지 컬러링
-    const badgeSpan = subAcc.element.querySelector('.accordion-header-badge');
-    if (totalErrors > 0) {
-      badgeSpan.style.backgroundColor = 'var(--color-slang-bg)';
-      badgeSpan.style.color = 'var(--color-slang-text)';
-    } else {
-      badgeSpan.style.backgroundColor = 'var(--color-success-bg)';
-      badgeSpan.style.color = 'var(--color-success-text)';
+    // 이 과목의 총 에러 개수 계산
+    const errCount = studentsInGroup.reduce((sum, s) => sum + (s.errors ? s.errors.length : 0), 0);
+
+    const item = document.createElement('div');
+    item.className = 'editor-student-item';
+    item.setAttribute('data-subject-key', key);
+    item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background-color 0.15s ease;';
+    
+    // 활성화 표시 스타일
+    if (state.activeSubjectKey === key) {
+      item.classList.add('active');
+      item.style.backgroundColor = 'var(--bg-active)';
     }
 
-    // 펼쳤을 때 학생 목록 카드 그리드 배치
-    const cardGrid = document.createElement('div');
-    cardGrid.className = 'group-card-grid';
-    subAcc.content.appendChild(cardGrid);
-    
-    // 학생 학번순 정렬
-    const sortedRecords = [...records].sort((a, b) => String(a.sNum).localeCompare(String(b.sNum)));
+    const badgeClass = errCount > 0 ? 'badge-error' : 'badge-success';
+    const badgeText = errCount > 0 ? `오류 ${errCount}건` : '정상';
+    const badgeStyle = errCount > 0
+      ? 'background-color: var(--color-spelling-bg); color: var(--color-spelling-text);'
+      : 'background-color: var(--color-success-bg); color: var(--color-success-text);';
 
-    sortedRecords.forEach(r => {
+    item.innerHTML = `
+      <div class="editor-student-item-info" style="flex: 1; min-width: 0; text-align: left;">
+        <div class="editor-student-item-name" style="font-weight: 600; font-size: 13px; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+          ${escapeHTML(subject)}
+        </div>
+        <div class="editor-student-item-snum" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+          ${year}년도 ${term} - ${gradeStr} (${studentsInGroup.length}명)
+        </div>
+      </div>
+      <div class="editor-student-item-status" style="margin-left: 8px;">
+        <span class="editor-student-status-badge" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; ${badgeStyle}">
+          ${badgeText}
+        </span>
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      // 기존 active 해제 및 지정
+      const siblings = DOM.subjectListContainer.querySelectorAll('.editor-student-item');
+      siblings.forEach(sib => {
+        sib.classList.remove('active');
+        sib.style.backgroundColor = '';
+      });
+      item.classList.add('active');
+      item.style.backgroundColor = 'var(--bg-active)';
+      
+      state.activeSubjectKey = key;
+      loadSubjectIntoView(key, studentsInGroup);
+    });
+
+    DOM.subjectListContainer.appendChild(item);
+  });
+
+  // 4. 만약 현재 선택된 과목 키가 활성 그룹 목록에 존재하면 다시 불러오고, 없으면 첫 번째 과목 강제 로드
+  if (state.activeSubjectKey && groups[state.activeSubjectKey]) {
+    loadSubjectIntoView(state.activeSubjectKey, groups[state.activeSubjectKey]);
+  } else {
+    // 첫 번째 과목 기본 선택
+    const firstItem = DOM.subjectListContainer.querySelector('.editor-student-item');
+    if (firstItem) {
+      firstItem.click();
+    } else {
+      if (DOM.subjectEmptyState) DOM.subjectEmptyState.style.display = 'flex';
+      if (DOM.subjectActiveContainer) DOM.subjectActiveContainer.style.display = 'none';
+    }
+  }
+}
+
+// 12.1. 선택된 과목 상세 뷰 로드 (오른쪽 리스트 렌더링)
+function loadSubjectIntoView(key, studentsInGroup) {
+  if (!DOM.subjectActiveContainer || !DOM.subjectEmptyState) return;
+
+  DOM.subjectEmptyState.style.display = 'none';
+  DOM.subjectActiveContainer.style.display = 'flex';
+
+  const [year, term, gradeStr, subject] = key.split('|');
+  if (DOM.currentSubjectTitle) DOM.currentSubjectTitle.textContent = subject;
+  if (DOM.currentSubjectMeta) DOM.currentSubjectMeta.textContent = `${year}학년도 ${term} - ${gradeStr} (${studentsInGroup.length}명)`;
+
+  if (DOM.subjectStudentCardsContainer) {
+    DOM.subjectStudentCardsContainer.innerHTML = '';
+    
+    // 학생 학번 및 이름 순으로 정렬
+    const sorted = [...studentsInGroup].sort((a, b) => String(a.sNum).localeCompare(String(b.sNum)));
+
+    sorted.forEach(s => {
       const card = document.createElement('div');
       card.className = 'group-student-card';
+      card.style.cssText = 'padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-primary); margin-bottom: 8px; cursor: pointer; transition: all 0.2s ease;';
+
+      // 마우스 오버 시 입체감 부여
+      card.addEventListener('mouseenter', () => {
+        card.style.borderColor = 'var(--border-focus)';
+        card.style.transform = 'translateY(-1px)';
+        card.style.boxShadow = 'var(--shadow-sm)';
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.borderColor = 'var(--border-color)';
+        card.style.transform = 'none';
+        card.style.boxShadow = 'none';
+      });
+
+      const { grade, classVal, numberVal } = parseGradeClassNumberFromSNum(s.sNum);
+      const studentMeta = `${grade}학년 ${classVal}반 ${numberVal}번 - ${s.sNum || '학번없음'}`;
+      const errCount = s.errors ? s.errors.length : 0;
       
-      const eCount = r.errors ? r.errors.length : 0;
-      const statusTxt = eCount > 0 ? `오류 ${eCount}` : '정상';
-      const statusStyle = eCount > 0 
+      const badgeStyle = errCount > 0
         ? 'background-color: var(--color-spelling-bg); color: var(--color-spelling-text);'
         : 'background-color: var(--color-success-bg); color: var(--color-success-text);';
-
-      const { grade, classVal } = parseGradeAndClass(r.sNum);
-      const studentMeta = `${grade} ${classVal} - ${r.sNum || '학번 없음'}`;
+      const badgeText = errCount > 0 ? `오류 ${errCount}건` : '정상';
 
       card.innerHTML = `
-        <div class="group-card-title">
-          <span>${escapeHTML(r.name)}</span>
-          <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight:600; ${statusStyle}">${statusTxt}</span>
+        <div class="group-card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 14px; color: var(--text-primary);">${escapeHTML(s.name)}</strong>
+          <span class="editor-student-status-badge" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; ${badgeStyle}">
+            ${badgeText}
+          </span>
         </div>
-        <div class="group-card-subtitle">${studentMeta}</div>
-        <div class="group-card-desc">${escapeHTML(r.content || '내용 없음')}</div>
+        <div class="group-card-subtitle" style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; text-align: left;">
+          ${studentMeta}
+        </div>
+        <div class="group-card-desc" style="font-size: 12px; color: var(--text-muted); line-height: 1.5; max-height: 48px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all; text-align: left;">
+          ${escapeHTML(s.content || '내용 없음')}
+        </div>
       `;
-      
-      // 카드 클릭 시 에디터 점프 연동
+
+      // 카드 클릭 시 해당 학생의 세특 편집 뷰로 이동
       card.addEventListener('click', () => {
-        const actualIndex = state.students.findIndex(s => s.id === r.id);
+        const actualIndex = state.students.findIndex(x => x.id === s.id);
         if (actualIndex !== -1) {
           state.currentStudentIndex = actualIndex;
           loadStudentIntoEditor(actualIndex);
           switchTab('student-group-view');
-          showToast(`'${r.name}' 학생의 '${sub}' 교정 화면으로 이동했습니다.`);
+          showToast(`'${s.name}' 학생의 '${subject}' 교정 화면으로 이동했습니다.`);
         }
       });
-      
-      cardGrid.appendChild(card);
+
+      DOM.subjectStudentCardsContainer.appendChild(card);
     });
-  });
-  
-  rebuildSelect(DOM.filterYear, years, '학년');
-  rebuildSelect(DOM.filterClass, classes, '반');
-  rebuildSelect(DOM.filterSubject, subjects, '과목');
+  }
 }
 
-// 에디터 좌측 학생 명부 렌더링 함수 (고유 학생 단위 중복 제거 개편)
+function parseGradeClassNumberFromSNum(sNum) {
+  if (!sNum) return { grade: '', classVal: '', numberVal: '' };
+  const num = String(sNum).trim();
+  if (num.length === 5) {
+    return {
+      grade: num[0],
+      classVal: String(parseInt(num.substring(1, 3))),
+      numberVal: String(parseInt(num.substring(3, 5)))
+    };
+  } else if (num.length === 4) {
+    return {
+      grade: num[0],
+      classVal: String(parseInt(num[1])),
+      numberVal: String(parseInt(num.substring(2, 4)))
+    };
+  }
+  return { grade: '', classVal: '', numberVal: '' };
+}
+
 function renderEditorStudentList() {
   const container = DOM.editorStudentListContainer;
   if (!container) return;

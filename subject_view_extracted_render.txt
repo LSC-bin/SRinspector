@@ -1,0 +1,221 @@
+// 12. 과목별 확인 탭 렌더링 (2단 분할 레이아웃 사양)
+function renderSubjectGroupView() {
+  if (!DOM.subjectListContainer) return;
+  DOM.subjectListContainer.innerHTML = '';
+
+  if (state.students.length === 0) {
+    if (DOM.subjectListCount) DOM.subjectListCount.textContent = '0';
+    if (DOM.subjectEmptyState) DOM.subjectEmptyState.style.display = 'flex';
+    if (DOM.subjectActiveContainer) DOM.subjectActiveContainer.style.display = 'none';
+    DOM.subjectListContainer.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+        분석된 학생 데이터가 없습니다.
+      </div>
+    `;
+    return;
+  }
+
+  // 1. 드롭다운 필터 요소들의 고유 데이터 추출 및 동적 구성
+  const yearsSet = new Set();
+  const termsSet = new Set();
+  const gradesSet = new Set();
+
+  state.students.forEach(s => {
+    if (s.year) yearsSet.add(s.year);
+    if (s.term) termsSet.add(s.term);
+    const { grade } = parseGradeClassNumberFromSNum(s.sNum);
+    if (grade) gradesSet.add(grade + '학년');
+  });
+
+  // select 갱신
+  rebuildSelect(DOM.subjectFilterYear, yearsSet, '학년도');
+  rebuildSelect(DOM.subjectFilterTerm, termsSet, '학기');
+  rebuildSelect(DOM.subjectFilterGrade, gradesSet, '학년');
+
+  // 현재 필터 값 획득
+  const filterYear = DOM.subjectFilterYear ? DOM.subjectFilterYear.value : 'all';
+  const filterTerm = DOM.subjectFilterTerm ? DOM.subjectFilterTerm.value : 'all';
+  const filterGrade = DOM.subjectFilterGrade ? DOM.subjectFilterGrade.value : 'all';
+  const searchQuery = DOM.subjectSearchInputTab ? DOM.subjectSearchInputTab.value.trim().toLowerCase() : '';
+
+  // 2. 학생 데이터 필터링 및 과목별 그룹화
+  const groups = {}; // key: "year|term|grade|subject" -> students array
+  
+  state.students.forEach(s => {
+    const { grade } = parseGradeClassNumberFromSNum(s.sNum);
+    const gradeStr = grade ? grade + '학년' : '학년없음';
+    const sub = s.subject || '과목없음';
+
+    // 필터 조건 체크
+    if (filterYear !== 'all' && s.year !== filterYear) return;
+    if (filterTerm !== 'all' && s.term !== filterTerm) return;
+    if (filterGrade !== 'all' && gradeStr !== filterGrade) return;
+    if (searchQuery && !sub.toLowerCase().includes(searchQuery)) return;
+
+    const groupKey = `${s.year}|${s.term}|${gradeStr}|${sub}`;
+    if (!groups[groupKey]) {
+      groups[groupKey] = [];
+    }
+    groups[groupKey].push(s);
+  });
+
+  const groupKeys = Object.keys(groups).sort();
+  if (DOM.subjectListCount) DOM.subjectListCount.textContent = groupKeys.length;
+
+  if (groupKeys.length === 0) {
+    if (DOM.subjectEmptyState) DOM.subjectEmptyState.style.display = 'flex';
+    if (DOM.subjectActiveContainer) DOM.subjectActiveContainer.style.display = 'none';
+    DOM.subjectListContainer.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-secondary); font-size: 13px;">
+        조건에 맞는 과목이 없습니다.
+      </div>
+    `;
+    return;
+  }
+
+  // 3. 왼쪽 사이드바 리스트 렌더링
+  groupKeys.forEach(key => {
+    const [year, term, gradeStr, subject] = key.split('|');
+    const studentsInGroup = groups[key];
+    
+    // 이 과목의 총 에러 개수 계산
+    const errCount = studentsInGroup.reduce((sum, s) => sum + (s.errors ? s.errors.length : 0), 0);
+
+    const item = document.createElement('div');
+    item.className = 'editor-student-item';
+    item.setAttribute('data-subject-key', key);
+    item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background-color 0.15s ease;';
+    
+    // 활성화 표시 스타일
+    if (state.activeSubjectKey === key) {
+      item.classList.add('active');
+      item.style.backgroundColor = 'var(--bg-active)';
+    }
+
+    const badgeClass = errCount > 0 ? 'badge-error' : 'badge-success';
+    const badgeText = errCount > 0 ? `오류 ${errCount}건` : '정상';
+    const badgeStyle = errCount > 0
+      ? 'background-color: var(--color-spelling-bg); color: var(--color-spelling-text);'
+      : 'background-color: var(--color-success-bg); color: var(--color-success-text);';
+
+    item.innerHTML = `
+      <div class="editor-student-item-info" style="flex: 1; min-width: 0; text-align: left;">
+        <div class="editor-student-item-name" style="font-weight: 600; font-size: 13px; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+          ${escapeHTML(subject)}
+        </div>
+        <div class="editor-student-item-snum" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+          ${year}년도 ${term} - ${gradeStr} (${studentsInGroup.length}명)
+        </div>
+      </div>
+      <div class="editor-student-item-status" style="margin-left: 8px;">
+        <span class="editor-student-status-badge" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; ${badgeStyle}">
+          ${badgeText}
+        </span>
+      </div>
+    `;
+
+    item.addEventListener('click', () => {
+      // 기존 active 해제 및 지정
+      const siblings = DOM.subjectListContainer.querySelectorAll('.editor-student-item');
+      siblings.forEach(sib => {
+        sib.classList.remove('active');
+        sib.style.backgroundColor = '';
+      });
+      item.classList.add('active');
+      item.style.backgroundColor = 'var(--bg-active)';
+      
+      state.activeSubjectKey = key;
+      loadSubjectIntoView(key, studentsInGroup);
+    });
+
+    DOM.subjectListContainer.appendChild(item);
+  });
+
+  // 4. 만약 현재 선택된 과목 키가 활성 그룹 목록에 존재하면 다시 불러오고, 없으면 첫 번째 과목 강제 로드
+  if (state.activeSubjectKey && groups[state.activeSubjectKey]) {
+    loadSubjectIntoView(state.activeSubjectKey, groups[state.activeSubjectKey]);
+  } else {
+    // 첫 번째 과목 기본 선택
+    const firstItem = DOM.subjectListContainer.querySelector('.editor-student-item');
+    if (firstItem) {
+      firstItem.click();
+    } else {
+      if (DOM.subjectEmptyState) DOM.subjectEmptyState.style.display = 'flex';
+      if (DOM.subjectActiveContainer) DOM.subjectActiveContainer.style.display = 'none';
+    }
+  }
+}
+
+// 12.1. 선택된 과목 상세 뷰 로드 (오른쪽 리스트 렌더링)
+function loadSubjectIntoView(key, studentsInGroup) {
+  if (!DOM.subjectActiveContainer || !DOM.subjectEmptyState) return;
+
+  DOM.subjectEmptyState.style.display = 'none';
+  DOM.subjectActiveContainer.style.display = 'flex';
+
+  const [year, term, gradeStr, subject] = key.split('|');
+  if (DOM.currentSubjectTitle) DOM.currentSubjectTitle.textContent = subject;
+  if (DOM.currentSubjectMeta) DOM.currentSubjectMeta.textContent = `${year}학년도 ${term} - ${gradeStr} (${studentsInGroup.length}명)`;
+
+  if (DOM.subjectStudentCardsContainer) {
+    DOM.subjectStudentCardsContainer.innerHTML = '';
+    
+    // 학생 학번 및 이름 순으로 정렬
+    const sorted = [...studentsInGroup].sort((a, b) => String(a.sNum).localeCompare(String(b.sNum)));
+
+    sorted.forEach(s => {
+      const card = document.createElement('div');
+      card.className = 'group-student-card';
+      card.style.cssText = 'padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-primary); margin-bottom: 8px; cursor: pointer; transition: all 0.2s ease;';
+
+      // 마우스 오버 시 입체감 부여
+      card.addEventListener('mouseenter', () => {
+        card.style.borderColor = 'var(--border-focus)';
+        card.style.transform = 'translateY(-1px)';
+        card.style.boxShadow = 'var(--shadow-sm)';
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.borderColor = 'var(--border-color)';
+        card.style.transform = 'none';
+        card.style.boxShadow = 'none';
+      });
+
+      const { grade, classVal, numberVal } = parseGradeClassNumberFromSNum(s.sNum);
+      const studentMeta = `${grade}학년 ${classVal}반 ${numberVal}번 - ${s.sNum || '학번없음'}`;
+      const errCount = s.errors ? s.errors.length : 0;
+      
+      const badgeStyle = errCount > 0
+        ? 'background-color: var(--color-spelling-bg); color: var(--color-spelling-text);'
+        : 'background-color: var(--color-success-bg); color: var(--color-success-text);';
+      const badgeText = errCount > 0 ? `오류 ${errCount}건` : '정상';
+
+      card.innerHTML = `
+        <div class="group-card-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 14px; color: var(--text-primary);">${escapeHTML(s.name)}</strong>
+          <span class="editor-student-status-badge" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; ${badgeStyle}">
+            ${badgeText}
+          </span>
+        </div>
+        <div class="group-card-subtitle" style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; text-align: left;">
+          ${studentMeta}
+        </div>
+        <div class="group-card-desc" style="font-size: 12px; color: var(--text-muted); line-height: 1.5; max-height: 48px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-all; text-align: left;">
+          ${escapeHTML(s.content || '내용 없음')}
+        </div>
+      `;
+
+      // 카드 클릭 시 해당 학생의 세특 편집 뷰로 이동
+      card.addEventListener('click', () => {
+        const actualIndex = state.students.findIndex(x => x.id === s.id);
+        if (actualIndex !== -1) {
+          state.currentStudentIndex = actualIndex;
+          loadStudentIntoEditor(actualIndex);
+          switchTab('student-group-view');
+          showToast(`'${s.name}' 학생의 '${subject}' 교정 화면으로 이동했습니다.`);
+        }
+      });
+
+      DOM.subjectStudentCardsContainer.appendChild(card);
+    });
+  }
+}

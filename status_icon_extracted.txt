@@ -1,0 +1,89 @@
+// 8. 학생 분석 로직 연동
+function runAnalysisOnStudent(index) {
+  if (index < 0 || index >= state.students.length) return;
+  const stud = state.students[index];
+  
+  // 커스텀 설정을 담아 분석 엔진 호출
+  const customConfig = {
+    ...state.settings,
+    customDictionary: state.customDictionary
+  };
+  
+  const rawErrors = window.inspectStudentRecord(stud.content, stud.name, customConfig);
+  
+  // X 버튼으로 무시한 단어들(ignoredWords) 제외 처리
+  stud.ignoredWords = stud.ignoredWords || [];
+  stud.errors = rawErrors.filter(err => !stud.ignoredWords.includes(err.original));
+  stud.checked = true;
+
+  // 좌측 배지 실시간 부분 업데이트
+  updateStudentListStatusIcon(index);
+
+  // Gemini AI 추가 정밀 검사가 활성화되어 있고 API Key가 유효할 때, 백그라운드 비동기 요청 수행
+  if (state.settings.aiEnabled && state.settings.aiKey && stud.content) {
+    triggerAiAnalysis(index);
+  }
+}
+
+// 좌측 학생 목록 상태 아이콘 갱신 헬퍼
+function updateStudentListStatusIcon(index) {
+  if (index < 0 || index >= state.students.length) return;
+  const stud = state.students[index];
+  if (!DOM.editorStudentListContainer) return;
+
+  const studKey = `${stud.sNum || '학번없음'}_${stud.name}`;
+  const item = DOM.editorStudentListContainer.querySelector(`.editor-student-item[data-student-key="${studKey}"]`);
+  if (item) {
+    const statusDiv = item.querySelector('.editor-student-item-status');
+    if (statusDiv) {
+      const studentAllRecords = state.students.filter(s => s.name === stud.name && s.sNum === stud.sNum);
+      const totalErrCount = studentAllRecords.reduce((sum, r) => sum + (r.errors ? r.errors.length : 0), 0);
+      
+      statusDiv.innerHTML = totalErrCount > 0 
+        ? '<i data-lucide="alert-circle" class="status-icon-warn" style="width:16px; height:16px;"></i>'
+        : '<i data-lucide="check-circle" class="status-icon-ok" style="width:16px; height:16px;"></i>';
+      lucide.createIcons();
+    }
+  }
+}
+
+// 백그라운드 AI 분석 트리거
+async function triggerAiAnalysis(index) {
+  if (index < 0 || index >= state.students.length) return;
+  const stud = state.students[index];
+  const origText = stud.content;
+  if (!origText) return;
+
+  // 1. 개인정보 비식별화 마스킹
+  const maskedText = maskStudentName(origText, stud.name);
+
+  // 2. Gemini API 비동기 점검 요청
+  const rawAiErrors = await fetchGeminiAiAnalysis(maskedText, stud.name);
+
+  // 3. AI 오류 결과를 로컬 인덱스 범위 포맷으로 복원
+  const mappedAiErrors = mapAiErrorsToLocalFormat(rawAiErrors, origText, maskedText, stud.name);
+
+  // 4. 기존 로컬 오류 목록과 병합 (중복 방지)
+  // 동일한 범위(start, end)에 오류가 이미 있으면 덮어쓰거나 무시
+  mappedAiErrors.forEach(aiErr => {
+    const isDuplicate = stud.errors.some(localErr => localErr.start === aiErr.start && localErr.end === aiErr.end);
+    if (!isDuplicate) {
+      stud.errors.push(aiErr);
+    }
+  });
+
+  // 5. X 버튼 무시 단어 목록 필터링 재적용
+  stud.ignoredWords = stud.ignoredWords || [];
+  stud.errors = stud.errors.filter(err => !stud.ignoredWords.includes(err.original));
+
+  // 6. 데이터 저장 및 대시보드 갱신
+  saveStudentsToStorage();
+  updateStudentListStatusIcon(index);
+
+  // 7. 만약 사용자가 현재 분석 결과가 도착한 학생을 보고 있는 상태라면 화면 즉시 갱신
+  if (state.currentStudentIndex === index) {
+    applyHighlightingToEditor();
+    renderInspectionResults();
+    updateDashboardStats();
+  }
+}
