@@ -1,0 +1,1471 @@
+@import url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/NanumSquareRound.css');
+
+/* Notion-like Styling for Student Record Checker */
+
+:root {
+  /* Notion Color Palette */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f5;
+  --bg-hover: rgba(55, 53, 47, 0.04);
+  --bg-selected: rgba(55, 53, 47, 0.08);
+  
+  --text-primary: #37352f;
+  --text-secondary: #787774;
+  --text-light: #acaba9;
+  
+  --border-color: rgba(55, 53, 47, 0.09);
+  --border-focus: #2383e2;
+  
+  /* Error Accent Colors (Notion Callout style) */
+  --color-spelling-bg: #ffe2dd;
+  --color-spelling-text: #d44027;
+  --color-spelling-border: #f9c0b7;
+  
+  --color-slang-bg: #fdecc8;
+  --color-slang-text: #b35900;
+  --color-slang-border: #f5d393;
+  
+  --color-loanword-bg: #e8edf2;
+  --color-loanword-text: #0c66e4;
+  --color-loanword-border: #b8c9e0;
+  
+  --color-forbidden-bg: #ffe2dd;
+  --color-forbidden-text: #d44027;
+  --color-forbidden-border: #f9c0b7;
+  
+  --color-spacing-bg: #f1f1ef;
+  --color-spacing-text: #37352f;
+  
+  --color-endingDot-bg: #f1f1ef;
+  --color-endingDot-text: #37352f;
+
+  --color-nameCheck-bg: #e3e2e0;
+  --color-nameCheck-text: #37352f;
+
+  --color-success-bg: #e2f5ec;
+  --color-success-text: #1f8a53;
+
+  /* Fonts */
+  --font-family: 'NanumSquareRound', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Apple SD Gothic Neo", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* App Container Layout */
+#app-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Sidebar Layout */
+/* Sidebar Layout */
+aside.sidebar {
+  width: 240px;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+aside.sidebar.collapsed {
+  width: 64px;
+}
+
+.sidebar-header {
+  padding: 20px 16px 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: padding 0.25s ease;
+  -webkit-app-region: drag;
+}
+
+.sidebar-header * {
+  -webkit-app-region: no-drag;
+}
+
+aside.sidebar.collapsed .sidebar-header {
+  padding: 16px 0;
+  justify-content: center !important;
+}
+
+aside.sidebar.collapsed .sidebar-brand-wrapper {
+  display: none !important;
+}
+
+.sidebar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.sidebar-logo {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.sidebar-menu {
+  flex-grow: 1;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: padding 0.25s ease;
+}
+
+aside.sidebar.collapsed .sidebar-menu {
+  padding: 0 4px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease, padding 0.25s ease, gap 0.25s ease, justify-content 0.25s ease;
+}
+
+aside.sidebar.collapsed .menu-item {
+  justify-content: center;
+  padding: 10px 0;
+  gap: 0;
+}
+
+aside.sidebar.collapsed .menu-item span {
+  display: none;
+}
+
+.menu-item:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.menu-item.active {
+  background-color: var(--bg-selected);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.menu-item i {
+  font-size: 16px;
+}
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: padding 0.25s ease;
+}
+
+aside.sidebar.collapsed .sidebar-footer {
+  padding: 16px 0;
+}
+
+aside.sidebar.collapsed .sidebar-footer p {
+  display: none;
+}
+
+/* Main Content Area */
+main.content-area {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+}
+
+/* Page Header */
+.page-header {
+  height: 56px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  padding-right: 140px; /* 우측 캡션 버튼 공간 확보 */
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.page-header * {
+  -webkit-app-region: no-drag;
+}
+
+.page-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Notion-like Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  white-space: nowrap; /* 글자가 강제로 줄바꿈되지 않도록 방지 */
+}
+
+.btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.btn-primary {
+  background-color: var(--border-focus);
+  color: #ffffff;
+  border-color: var(--border-focus);
+}
+
+.btn-primary:hover {
+  background-color: #1c72cb;
+}
+
+.btn-danger {
+  color: var(--color-spelling-text);
+  border-color: var(--border-color);
+}
+
+.btn-danger:hover {
+  background-color: var(--color-spelling-bg);
+}
+
+.btn-secondary {
+  background-color: var(--bg-secondary);
+}
+
+/* Tab Container Styles */
+.tab-content {
+  flex-grow: 1;
+  overflow: hidden;
+  display: none;
+}
+
+.tab-content.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tab 1: Data Management Grid */
+.data-tab-wrapper {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Drag and Drop Zone */
+.upload-zone {
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-secondary);
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.upload-zone:hover {
+  border-color: var(--border-focus);
+  background-color: rgba(35, 131, 226, 0.03);
+}
+
+.upload-zone i {
+  font-size: 32px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.upload-zone h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.upload-zone p {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Table controls */
+.table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box i {
+  position: absolute;
+  left: 10px;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.search-box input {
+  padding: 6px 10px 6px 30px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  outline: none;
+  width: 240px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.search-box input:focus {
+  border-color: var(--border-focus);
+  background-color: var(--bg-primary);
+}
+
+/* Notion Database Table View */
+.table-wrapper {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 400px;
+}
+
+.notion-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.notion-table th {
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.notion-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  color: var(--text-primary);
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notion-table tr:hover {
+  background-color: var(--bg-hover);
+}
+
+.notion-table td.editable-cell:focus {
+  outline: 2px solid var(--border-focus);
+  background-color: var(--bg-primary);
+}
+
+.notion-table th:last-child,
+.notion-table td:last-child {
+  border-right: none;
+}
+
+.notion-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Row Actions column style */
+.row-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.action-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.action-icon-btn:hover {
+  background-color: var(--bg-selected);
+  color: var(--text-primary);
+}
+
+/* Tab 2: Inspection and Editor (Split View) */
+.inspection-container {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Left panel: student navigation + editor */
+.editor-panel {
+  width: 60%;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Student selection box */
+.student-selector-bar {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.student-info-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.student-tag {
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background-color: var(--bg-selected);
+  font-weight: 500;
+}
+
+.student-nav-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+/* Text Editor Layout */
+.editor-body-wrapper {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.editor-field-group {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.editor-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+}
+
+.editor-input {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+
+.editor-input:focus {
+  border-color: var(--border-focus);
+}
+
+/* Main Textarea Container with Highlighting overlay */
+.editor-text-container {
+  flex-grow: 1;
+  position: relative;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* We will use contenteditable div for rendering real-time highlights */
+.editor-textarea {
+  flex-grow: 1;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  outline: none;
+  overflow-y: auto;
+  font-family: inherit;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.editor-textarea:empty:before {
+  content: "점검할 내용을 이곳에 입력하거나 데이터를 선택하세요.";
+  color: var(--text-light);
+  cursor: text;
+}
+
+/* Error highlight classes inside contenteditable */
+.hl-spelling {
+  background-color: var(--color-spelling-bg);
+  border-bottom: 2px solid var(--color-spelling-text);
+  color: inherit;
+  cursor: pointer;
+}
+
+.hl-slang {
+  background-color: var(--color-slang-bg);
+  border-bottom: 2px solid var(--color-slang-text);
+  color: inherit;
+  cursor: pointer;
+}
+
+.hl-loanword {
+  background-color: var(--color-loanword-bg);
+  border-bottom: 2px solid var(--color-loanword-text);
+  color: inherit;
+  cursor: pointer;
+}
+
+.hl-forbidden {
+  background-color: var(--color-forbidden-bg);
+  border-bottom: 2px solid var(--color-forbidden-text);
+  border-top: 1px solid var(--color-forbidden-border);
+  color: inherit;
+  cursor: pointer;
+}
+
+.hl-spacing {
+  background-color: var(--color-spacing-bg);
+  border-bottom: 2px dotted var(--text-secondary);
+  color: inherit;
+  cursor: pointer;
+}
+
+.hl-endingDot {
+  background-color: var(--color-endingDot-bg);
+  border-bottom: 2px dashed var(--text-secondary);
+  color: inherit;
+  cursor: pointer;
+}
+
+.hl-nameCheck {
+  background-color: var(--color-nameCheck-bg);
+  border-bottom: 2px solid var(--text-primary);
+  color: inherit;
+  cursor: pointer;
+}
+
+.hl-custom {
+  background-color: #e3e2e0;
+  border-bottom: 2px solid #37352f;
+  color: inherit;
+  cursor: pointer;
+}
+
+.hl-ai {
+  background-color: #fef08a !important; /* bright yellow highlighter background */
+  border-bottom: 2px solid #eab308 !important; /* dark yellow/gold underline */
+  color: #1f2937 !important; /* dark text for readability */
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+/* Editor footer with Bytes calculation */
+.editor-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.byte-counter {
+  display: flex;
+  gap: 12px;
+}
+
+.byte-badge {
+  font-weight: 600;
+}
+
+.byte-warning {
+  color: var(--color-spelling-text);
+}
+
+/* Right panel: inspection results list */
+.results-panel {
+  width: 40%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-secondary);
+}
+
+.results-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.results-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.results-count-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background-color: var(--text-secondary);
+  color: #ffffff;
+}
+
+.results-list {
+  flex-grow: 1;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--text-secondary);
+  height: 100%;
+}
+
+.empty-state i {
+  font-size: 32px;
+  margin-bottom: 8px;
+  color: var(--text-light);
+}
+
+.empty-state h4 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  font-size: 11px;
+}
+
+/* Notion-like Flat Review List Item (개편된 심플 룩) */
+.error-card {
+  display: flex;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: transparent;
+  font-size: 13px;
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+}
+
+.error-card:hover {
+  background-color: var(--bg-hover);
+}
+
+.error-card-content {
+  flex-grow: 1;
+}
+
+.error-card-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.error-card-match {
+  margin: 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.error-card-match del {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  margin-right: 4px;
+}
+
+.error-card-match ins {
+  text-decoration: none;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.error-card-desc {
+  font-size: 12px;
+  color: var(--text-light);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.error-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* 텍스트형 링크 버튼 스타일 */
+.btn-text {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-text:hover {
+  background-color: var(--bg-selected);
+  color: var(--border-focus);
+}
+
+/* Error card color mapping (좌측의 2px 칼라바로 슬림화) */
+.error-card.card-spelling {
+  border-left: 2px solid var(--color-spelling-border);
+}
+.error-card.card-spelling ins {
+  background-color: var(--color-spelling-bg);
+  color: var(--color-spelling-text);
+}
+.error-card.card-spelling .error-card-label {
+  color: var(--color-spelling-text);
+}
+
+.error-card.card-slang {
+  border-left: 2px solid var(--color-slang-border);
+}
+.error-card.card-slang ins {
+  background-color: var(--color-slang-bg);
+  color: var(--color-slang-text);
+}
+.error-card.card-slang .error-card-label {
+  color: var(--color-slang-text);
+}
+
+.error-card.card-loanword {
+  border-left: 2px solid var(--color-loanword-border);
+}
+.error-card.card-loanword ins {
+  background-color: var(--color-loanword-bg);
+  color: var(--color-loanword-text);
+}
+.error-card.card-loanword .error-card-label {
+  color: var(--color-loanword-text);
+}
+
+.error-card.card-forbidden {
+  border-left: 2px solid var(--color-forbidden-border);
+}
+.error-card.card-forbidden ins {
+  background-color: var(--color-forbidden-bg);
+  color: var(--color-forbidden-text);
+}
+.error-card.card-forbidden .error-card-label {
+  color: var(--color-forbidden-text);
+}
+
+.error-card.card-spacing,
+.error-card.card-endingDot {
+  border-left: 2px solid #6b7280;
+}
+.error-card.card-spacing ins,
+.error-card.card-endingDot ins {
+  background-color: var(--color-spacing-bg);
+  color: var(--text-primary);
+}
+
+.error-card.card-nameCheck {
+  border-left: 2px solid #37352f;
+}
+.error-card.card-nameCheck ins {
+  background-color: var(--color-nameCheck-bg);
+  color: var(--text-primary);
+}
+
+.error-card.card-ai {
+  border-left: 2px solid #ca8a04; /* dark gold/yellow vertical bar */
+}
+.error-card.card-ai ins {
+  background-color: #fef08a;
+  color: #854d0e;
+}
+.error-card.card-ai .error-card-label {
+  color: #854d0e;
+  font-weight: 600;
+}
+
+/* 2단 분할 에디터 전체 레이아웃 구조 */
+.split-container {
+  display: flex;
+  height: calc(100vh - 56px); /* 헤더바 감안 */
+  margin: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.sidebar-student-list {
+  width: 290px;
+  border-right: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, border-color 0.25s ease;
+  opacity: 1;
+}
+
+.sidebar-student-list.collapsed {
+  width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  border-right: 1px solid transparent;
+  overflow: hidden;
+}
+
+/* 오류 및 건의사항 결과 패널 접기 효과 */
+.results-panel {
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, border-color 0.25s ease;
+  opacity: 1;
+}
+
+.results-panel.collapsed {
+  width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  border-left: 1px solid transparent !important;
+  overflow: hidden;
+}
+
+.btn-icon {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-icon:hover {
+  background-color: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.editor-main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+}
+
+.inspection-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  border: none;
+  height: 100%;
+}
+
+/* Tab 3: Settings Grid */
+.settings-tab-wrapper {
+  padding: 24px 32px;
+  overflow-y: auto;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-section {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 24px;
+}
+
+.settings-section:last-child {
+  border-bottom: none;
+}
+
+.settings-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Notion Toggle Switch List */
+.toggle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.toggle-details h5 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.toggle-details p {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* CSS Toggle Switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--text-light);
+  transition: .2s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--border-focus);
+}
+
+input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+/* User Dictionary styling */
+.dictionary-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dictionary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr auto;
+  gap: 8px;
+}
+
+.dictionary-row input {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+  background-color: var(--bg-primary);
+}
+
+.dictionary-row input:focus {
+  border-color: var(--border-focus);
+}
+
+/* Statistics dashboard widget in data-tab */
+.dashboard-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.summary-card {
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.summary-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Toast alert notification */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  background-color: var(--text-primary);
+  color: var(--bg-primary);
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: slideIn 0.2s ease forwards;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Notion-like Accordion and Grouping style */
+.group-accordion {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.accordion-header {
+  padding: 10px 16px;
+  background-color: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: background-color 0.15s ease;
+}
+
+.accordion-header:hover {
+  background-color: var(--bg-hover);
+}
+
+.accordion-header i.chevron {
+  transition: transform 0.15s ease;
+  color: var(--text-secondary);
+}
+
+.accordion-header.open i.chevron {
+  transform: rotate(90deg);
+}
+
+.accordion-header-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background-color: var(--bg-selected);
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.accordion-content {
+  display: none;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+}
+
+.accordion-content.open {
+  display: block;
+}
+
+/* Hierarchical nesting */
+.accordion-content .group-accordion {
+  margin-bottom: 4px;
+}
+
+/* Clickable Grouping Card */
+.group-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.group-student-card {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.group-student-card:hover {
+  border-color: var(--border-focus);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+.group-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.group-card-subtitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.group-card-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.group-card-badge-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* 2단 분할 에디터 좌측 학생 명부 스타일 */
+.editor-student-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  background-color: var(--bg-primary);
+  margin-bottom: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.editor-student-item + .editor-student-item {
+  margin-top: -1px;
+}
+
+.editor-student-item:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.editor-student-item:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.editor-student-item:hover {
+  border-color: var(--border-focus);
+  background-color: var(--bg-hover);
+  position: relative;
+  z-index: 1;
+}
+
+.editor-student-item.active {
+  border-color: var(--border-focus);
+  background-color: var(--bg-selected);
+  box-shadow: inset 3px 0 0 var(--border-focus);
+  position: relative;
+  z-index: 2;
+}
+
+.editor-student-item-idx {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-light);
+  background-color: var(--bg-secondary);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.editor-student-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editor-student-item-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.editor-student-item-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.editor-student-item-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-icon-ok {
+  color: var(--color-success-text);
+  fill: var(--color-success-bg);
+}
+
+.status-icon-warn {
+  color: var(--color-spelling-text);
+  fill: var(--color-spelling-bg);
+}
+
+.editor-panel {
+  border: none;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+}
+
+/* 과목별 확인 탭의 좌측 과목 리스트 아이템 스타일 */
+.subject-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  background-color: var(--bg-primary);
+  margin-bottom: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.subject-list-item + .subject-list-item {
+  margin-top: -1px;
+}
+
+.subject-list-item:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.subject-list-item:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.subject-list-item:hover {
+  border-color: var(--border-focus);
+  background-color: var(--bg-hover);
+  position: relative;
+  z-index: 1;
+}
+
+.subject-list-item.active {
+  border-color: var(--border-focus);
+  background-color: var(--bg-selected);
+  box-shadow: inset 3px 0 0 var(--border-focus);
+  position: relative;
+  z-index: 2;
+}
+
+.subject-list-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.subject-list-item-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.subject-list-item-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.subject-list-item-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 과목별 확인 탭 우측 학생 카드가 1줄에 1개씩 배치되도록 설정 */
+#subject-student-cards-container .group-card-grid {
+  grid-template-columns: 1fr;
+  gap: 0; /* 카드 사이 간격 제거 */
+}
+
+#subject-student-cards-container .group-student-card {
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+#subject-student-cards-container .group-student-card + .group-student-card {
+  margin-top: -1px; /* 테두리 중복 방지 */
+}
+
+#subject-student-cards-container .group-student-card:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+#subject-student-cards-container .group-student-card:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+#subject-student-cards-container .group-card-desc {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+#subject-student-cards-container .group-student-card {
+  min-width: 0;
+}
+#subject-student-cards-container .group-card-title,
+#subject-student-cards-container .group-card-subtitle {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: keep-all;
+}
